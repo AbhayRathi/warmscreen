@@ -236,11 +236,14 @@ export class VerifierAgent extends BaseAgent {
     }
 
     // Goal 3: Technical Accuracy - Check for contradictions with key facts
+    // Note: This contains domain-specific contradiction patterns that could be
+    // externalized to a configuration in future iterations for better maintainability
     let hasFactualErrors = false;
     for (const fact of contextKnowledge.keyFacts) {
       const factLower = fact.toLowerCase();
       
-      // Check for specific contradictions
+      // Check for specific contradictions (e.g., one-way vs two-way binding)
+      // These patterns identify common technical misconceptions in frontend frameworks
       if (factLower.includes('one-way') && lowerTranscript.includes('two-way')) {
         hasFactualErrors = true;
         reasoning.push(
@@ -361,7 +364,14 @@ export class VerifierAgent extends BaseAgent {
         }
       } else if (!consistencyResult.agentAgreement) {
         agentToRefine = consistencyResult.lowestConfidenceAgent;
-        critiquePrompt = `Please re-evaluate your assessment with higher confidence. Your confidence (${agentOutputs[agentToRefine.toLowerCase() as keyof AgentOutputs]?.confidence?.toFixed(2) || 'N/A'}) is significantly lower than peer agents.`;
+        // Use explicit mapping for safe property access
+        const agentConfidenceMap = {
+          'Analyzer': agentOutputs.analyzer.confidence,
+          'Tagger': agentOutputs.tagger.confidence,
+          'Scorer': agentOutputs.scorer.confidence,
+        };
+        const confidence = agentConfidenceMap[agentToRefine];
+        critiquePrompt = `Please re-evaluate your assessment with higher confidence. Your confidence (${confidence?.toFixed(2) || 'N/A'}) is significantly lower than peer agents.`;
       } else if (factualResult.hasFactualErrors) {
         agentToRefine = 'Analyzer';
         critiquePrompt = 'Please re-evaluate the technical accuracy. A factual error was detected that contradicts the expected knowledge.';
@@ -411,9 +421,12 @@ export class VerifierAgent extends BaseAgent {
 
   /**
    * Check if transcript has related terms for a concept
+   * Note: This contains domain-specific terminology mappings that could be
+   * externalized to a configuration file for better maintainability
    */
   private hasRelatedTerm(transcript: string, concept: string): boolean {
     // Define related terms for common concepts
+    // These mappings help identify when candidates use synonyms or variant phrasings
     const relatedTerms: Record<string, string[]> = {
       'one-way binding': ['unidirectional', 'one way', 'single direction', 'props down', 'one-way data binding'],
       'data flow': ['data flows', 'flow of data', 'information flow'],
@@ -466,21 +479,26 @@ export class VerifierAgent extends BaseAgent {
     
     // Check consistency across agents
     const confidences = agentOutputs.map(o => o.confidence);
-    const avgConfidence = confidences.reduce((a, b) => a + b, 0) / confidences.length;
+    const avgConfidence = confidences.length > 0 
+      ? confidences.reduce((a, b) => a + b, 0) / confidences.length 
+      : 0;
     checks.push({
       name: 'confidence_consistency',
-      passed: confidences.every(c => Math.abs(c - avgConfidence) < 0.3),
-      message: 'Agent confidences are consistent',
+      passed: confidences.length > 0 && confidences.every(c => Math.abs(c - avgConfidence) < 0.3),
+      message: confidences.length > 0 ? 'Agent confidences are consistent' : 'No agent confidences to check',
     });
 
-    // Check for outliers
+    // Check for outliers - handle empty array explicitly
     const scores = agentOutputs
-      .filter(o => o.result.scores)
+      .filter(o => o.result?.scores)
       .flatMap(o => Object.values(o.result.scores) as number[]);
+    const scoresValid = scores.length > 0 
+      ? scores.every(s => s >= 0 && s <= 10)
+      : true; // No scores to validate is considered valid for this check
     checks.push({
       name: 'score_validation',
-      passed: scores.every(s => s >= 0 && s <= 10),
-      message: 'All scores within valid range',
+      passed: scoresValid,
+      message: scores.length > 0 ? 'All scores within valid range' : 'No scores to validate',
     });
 
     const allChecksPassed = checks.every(c => c.passed);
