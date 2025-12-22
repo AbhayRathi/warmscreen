@@ -302,7 +302,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/workspaces/warmscreen/packages/database/prisma/generated/client",
+      "value": "/home/runner/work/warmscreen/warmscreen/packages/database/prisma/generated/client",
       "fromEnvVar": null
     },
     "config": {
@@ -311,17 +311,16 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "debian-openssl-1.1.x",
+        "value": "debian-openssl-3.0.x",
         "native": true
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/workspaces/warmscreen/packages/database/prisma/schema.prisma",
+    "sourceFilePath": "/home/runner/work/warmscreen/warmscreen/packages/database/prisma/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
-    "rootEnvPath": null,
-    "schemaEnvPath": "../../../.env"
+    "rootEnvPath": null
   },
   "relativePath": "../..",
   "clientVersion": "6.19.0",
@@ -330,6 +329,8 @@ const config = {
     "db"
   ],
   "activeProvider": "postgresql",
+  "postinstall": true,
+  "ciName": "GitHub Actions",
   "inlineDatasources": {
     "db": {
       "url": {
