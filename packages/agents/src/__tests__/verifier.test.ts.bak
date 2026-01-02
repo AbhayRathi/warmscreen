@@ -35,13 +35,14 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
-      expect(result.confidence_score).toBeGreaterThan(0.8);
-      expect(result.is_consistent).toBe(true);
-      expect(result.is_accurate).toBe(true);
-      expect(result.reflexion_required).toBe(false);
-      expect(result.recommended_refinement.agent_to_refine).toBe('None');
+      expect(verifierOutput.confidence_score).toBeGreaterThan(0.8);
+      expect(verifierOutput.is_consistent).toBe(true);
+      expect(verifierOutput.is_accurate).toBe(true);
+      expect(verifierOutput.reflexion_required).toBe(false);
+      expect(verifierOutput.recommended_refinement.agent_to_refine).toBe('None');
     });
   });
 
@@ -71,13 +72,14 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
-      expect(result.confidence_score).toBeLessThan(0.8);
-      expect(result.is_consistent).toBe(false);
-      expect(result.reflexion_required).toBe(true);
-      expect(result.critique_reasoning).toContain('Score-tag misalignment');
-      expect(result.recommended_refinement.agent_to_refine).toBe('Tagger');
+      expect(verifierOutput.confidence_score).toBeLessThan(0.8);
+      expect(verifierOutput.is_consistent).toBe(false);
+      expect(verifierOutput.reflexion_required).toBe(true);
+      expect(verifierOutput.critique_reasoning).toContain('Score-tag misalignment');
+      expect(verifierOutput.recommended_refinement.agent_to_refine).toBe('Tagger');
     });
   });
 
@@ -107,13 +109,14 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
-      expect(result.is_accurate).toBe(false);
-      expect(result.confidence_score).toBeLessThanOrEqual(0.7);
-      expect(result.reflexion_required).toBe(true);
-      expect(result.critique_reasoning).toContain('contradiction');
-      expect(result.recommended_refinement.agent_to_refine).toBe('Analyzer');
+      expect(verifierOutput.is_accurate).toBe(false);
+      expect(verifierOutput.confidence_score).toBeLessThanOrEqual(0.7);
+      expect(verifierOutput.reflexion_required).toBe(true);
+      expect(verifierOutput.critique_reasoning).toContain('contradiction');
+      expect(verifierOutput.recommended_refinement.agent_to_refine).toBe('Analyzer');
     });
 
     it('should handle related term matching for concept coverage', async () => {
@@ -140,12 +143,13 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
       // Should pass because "unidirectional" is a related term for "one-way binding"
       // and "properties" is related to "props"
-      expect(result.is_accurate).toBe(true);
-      expect(result.confidence_score).toBeGreaterThan(0.7);
+      expect(verifierOutput.is_accurate).toBe(true);
+      expect(verifierOutput.confidence_score).toBeGreaterThan(0.7);
     });
   });
 
@@ -174,12 +178,13 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
-      expect(result.is_consistent).toBe(false);
-      expect(result.reflexion_required).toBe(true);
-      expect(result.critique_reasoning).toContain('Agent disagreement');
-      expect(result.recommended_refinement.agent_to_refine).toBe('Analyzer');
+      expect(verifierOutput.is_consistent).toBe(false);
+      expect(verifierOutput.reflexion_required).toBe(true);
+      expect(verifierOutput.critique_reasoning).toContain('Agent disagreement');
+      expect(verifierOutput.recommended_refinement.agent_to_refine).toBe('Analyzer');
     });
   });
 
@@ -208,14 +213,15 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
-      expect(result.reflexion_required).toBe(true);
-      expect(result.recommended_refinement.agent_to_refine).not.toBe('None');
-      expect(result.recommended_refinement.critique_prompt_injection).toBeTruthy();
-      expect(result.recommended_refinement.critique_prompt_injection.length).toBeGreaterThan(20);
+      expect(verifierOutput.reflexion_required).toBe(true);
+      expect(verifierOutput.recommended_refinement.agent_to_refine).not.toBe('None');
+      expect(verifierOutput.recommended_refinement.critique_prompt_injection).toBeTruthy();
+      expect(verifierOutput.recommended_refinement.critique_prompt_injection.length).toBeGreaterThan(20);
       // Prompt should be specific and actionable
-      expect(result.recommended_refinement.critique_prompt_injection).toMatch(/coverage|scoring|analysis|review/i);
+      expect(verifierOutput.recommended_refinement.critique_prompt_injection).toMatch(/coverage|scoring|analysis|review/i);
     });
   });
 
@@ -244,12 +250,13 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
-      expect(result.is_accurate).toBe(false);
-      expect(result.confidence_score).toBeLessThan(0.5);
-      expect(result.reflexion_required).toBe(true);
-      expect(result.critique_reasoning).toMatch(/Empty|short transcript/i);
+      expect(verifierOutput.is_accurate).toBe(false);
+      expect(verifierOutput.confidence_score).toBeLessThan(0.5);
+      expect(verifierOutput.reflexion_required).toBe(true);
+      expect(verifierOutput.critique_reasoning).toMatch(/Empty|short transcript/i);
     });
 
     it('should penalize very short transcripts', async () => {
@@ -276,10 +283,11 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
-      expect(result.critique_reasoning).toContain('short transcript');
-      expect(result.confidence_score).toBeLessThan(0.75);
+      expect(verifierOutput.critique_reasoning).toContain('short transcript');
+      expect(verifierOutput.confidence_score).toBeLessThan(0.75);
     });
   });
 
@@ -299,7 +307,7 @@ describe('VerifierAgent Three-Stage Verification', () => {
 
       // Should return legacy error result since it doesn't match VerifierInput
       expect(result).toHaveProperty('type');
-      expect((result as AgentOutput).result.verified).toBe(false);
+      expect((result as AgentOutput).verifierOutput.verified).toBe(false);
       expect((result as AgentOutput).confidence).toBeLessThan(0.5);
     });
 
@@ -318,13 +326,12 @@ describe('VerifierAgent Three-Stage Verification', () => {
 
       // Type guard will fail, so it goes to legacy path which also fails
       // Should return legacy error output
-      if ('confidence_score' in result.result) {
-        const verifierOutput = result.result as unknown as VerifierOutput;
-        expect(verifierOutput.confidence_score).toBeLessThan(0.5);
-        expect(verifierOutput.reflexion_required).toBe(true);
+      if ('confidence_score' in result) {
+        expect((result as VerifierOutput).confidence_score).toBeLessThan(0.5);
+        expect((result as VerifierOutput).reflexion_required).toBe(true);
       } else {
         expect((result as AgentOutput).confidence).toBeLessThan(0.5);
-        expect((result as AgentOutput).result.verified).toBe(false);
+        expect((result as AgentOutput).verifierOutput.verified).toBe(false);
       }
     });
 
@@ -340,11 +347,12 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
-      expect(result.confidence_score).toBeLessThan(0.5);
-      expect(result.reflexion_required).toBe(true);
-      expect(result.critique_reasoning).toContain('score must be a number');
+      expect(verifierOutput.confidence_score).toBeLessThan(0.5);
+      expect(verifierOutput.reflexion_required).toBe(true);
+      expect(verifierOutput.critique_reasoning).toContain('score must be a number');
     });
 
     it('should return error result for non-array tags', async () => {
@@ -359,11 +367,12 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
-      expect(result.confidence_score).toBeLessThan(0.5);
-      expect(result.reflexion_required).toBe(true);
-      expect(result.critique_reasoning).toContain('tags must be an array');
+      expect(verifierOutput.confidence_score).toBeLessThan(0.5);
+      expect(verifierOutput.reflexion_required).toBe(true);
+      expect(verifierOutput.critique_reasoning).toContain('tags must be an array');
     });
   });
 
@@ -380,7 +389,8 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
       // Should handle the error gracefully and return valid output
       expect(result).toHaveProperty('confidence_score');
@@ -415,13 +425,13 @@ describe('VerifierAgent Three-Stage Verification', () => {
         reflexionLoop: 0,
       };
 
-      const result = await verifier.execute(legacyInput);
+      const result = await verifier.execute(legacyInput) as AgentOutput;
 
       expect(result).toHaveProperty('type');
       expect(result).toHaveProperty('result');
       expect(result).toHaveProperty('confidence');
       expect(result).toHaveProperty('reflexionLoop');
-      expect(result.type).toBe('VERIFIER');
+      expect(verifierOutput.type).toBe('VERIFIER');
     });
 
     it('should perform legacy verification checks', async () => {
@@ -446,12 +456,12 @@ describe('VerifierAgent Three-Stage Verification', () => {
         reflexionLoop: 0,
       };
 
-      const result = await verifier.execute(legacyInput);
+      const result = await verifier.execute(legacyInput) as AgentOutput;
 
-      expect(result.result).toHaveProperty('verified');
-      expect(result.result).toHaveProperty('checks');
-      expect(result.result).toHaveProperty('issuesFound');
-      expect(result.result).toHaveProperty('recommendations');
+      expect(verifierOutput.result).toHaveProperty('verified');
+      expect(verifierOutput.result).toHaveProperty('checks');
+      expect(verifierOutput.result).toHaveProperty('issuesFound');
+      expect(verifierOutput.result).toHaveProperty('recommendations');
     });
   });
 
@@ -468,11 +478,12 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
       // Should have significant penalty (0.35) for score-tag misalignment
-      expect(result.confidence_score).toBeLessThan(0.7);
-      expect(result.is_consistent).toBe(false);
+      expect(verifierOutput.confidence_score).toBeLessThan(0.7);
+      expect(verifierOutput.is_consistent).toBe(false);
     });
 
     it('should apply cumulative penalties correctly', async () => {
@@ -490,12 +501,13 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
       // Should have multiple penalties: disagreement (0.15) + factual error (0.25)
-      expect(result.confidence_score).toBeLessThan(0.65);
-      expect(result.is_consistent).toBe(false);
-      expect(result.is_accurate).toBe(false);
+      expect(verifierOutput.confidence_score).toBeLessThan(0.65);
+      expect(verifierOutput.is_consistent).toBe(false);
+      expect(verifierOutput.is_accurate).toBe(false);
     });
   });
 
@@ -514,14 +526,15 @@ describe('VerifierAgent Three-Stage Verification', () => {
         },
       };
 
-      const result = await verifier.executeWithVerifierInput(input);
+      const result = await verifier.execute(input as any) as AgentOutput;
+      const verifierOutput = verifierOutput.result as VerifierOutput;
 
-      expect(result.critique_reasoning).toContain('Stage 1');
-      expect(result.critique_reasoning).toContain('Stage 2');
-      expect(result.critique_reasoning).toContain('Stage 3');
-      expect(result.critique_reasoning).toContain('Consistency Check');
-      expect(result.critique_reasoning).toContain('Factual Audit');
-      expect(result.critique_reasoning).toContain('Reflexion Decision');
+      expect(verifierOutput.critique_reasoning).toContain('Stage 1');
+      expect(verifierOutput.critique_reasoning).toContain('Stage 2');
+      expect(verifierOutput.critique_reasoning).toContain('Stage 3');
+      expect(verifierOutput.critique_reasoning).toContain('Consistency Check');
+      expect(verifierOutput.critique_reasoning).toContain('Factual Audit');
+      expect(verifierOutput.critique_reasoning).toContain('Reflexion Decision');
     });
   });
 });

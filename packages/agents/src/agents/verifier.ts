@@ -94,47 +94,72 @@ export class VerifierAgent extends BaseAgent {
   }
 
   /**
-   * Main execution method with error handling (addresses Issue #2)
-   * Supports both new VerifierInput and legacy AgentInput for backward compatibility
+   * Execute verification with VerifierInput format
+   * Returns VerifierOutput directly for type safety
    * 
-   * @param input - Either VerifierInput (new three-stage format) or AgentInput (legacy format)
-   * @returns VerifierOutput with three-stage verification results or legacy AgentOutput
+   * @param input - VerifierInput with three-stage verification data
+   * @returns VerifierOutput with verification results
+   */
+  async executeWithVerifierInput(input: VerifierInput): Promise<VerifierOutput> {
+    try {
+      return await this.executeVerification(input);
+    } catch (error) {
+      console.error('[VerifierAgent] Execution failed:', error);
+      // Return safe fallback as VerifierOutput
+      return {
+        confidence_score: 0.3,
+        is_consistent: false,
+        is_accurate: false,
+        reflexion_required: true,
+        critique_reasoning: `Verification failed due to error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        recommended_refinement: {
+          agent_to_refine: 'None',
+          critique_prompt_injection: 'Unable to determine refinement due to verification error',
+        },
+      };
+    }
+  }
+
+  /**
+   * Main execution method - Overrides BaseAgent.execute()
+   * Routes to appropriate verification method based on input type
+   * 
+   * @param input - AgentInput (supports both legacy and VerifierInput via duck typing)
+   * @returns AgentOutput (wraps VerifierOutput when using new format)
    * @throws Never throws - returns safe fallback on errors
    */
-  async execute(input: VerifierInput | AgentInput): Promise<VerifierOutput | AgentOutput> {
+  async execute(input: AgentInput): Promise<AgentOutput> {
     try {
-      if (this.isVerifierInput(input)) {
-        return await this.executeVerification(input);
+      // Cast to union type for internal routing
+      const unionInput = input as AgentInput | VerifierInput;
+      
+      if (this.isVerifierInput(unionInput)) {
+        const verifierOutput = await this.executeVerification(unionInput);
+        // Wrap as AgentOutput for base class compatibility
+        return {
+          type: this.type,
+          result: verifierOutput,
+          confidence: verifierOutput.confidence_score,
+          reflexionLoop: input.reflexionLoop || 0,
+          shouldReflect: verifierOutput.reflexion_required,
+        };
       }
       return await this.executeLegacy(input);
     } catch (error) {
       console.error('[VerifierAgent] Execution failed:', error);
-      // Return safe fallback
-      if (this.isVerifierInput(input)) {
-        return {
-          confidence_score: 0.3,
-          is_consistent: false,
-          is_accurate: false,
-          reflexion_required: true,
-          critique_reasoning: `Verification failed due to error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          recommended_refinement: {
-            agent_to_refine: 'None',
-            critique_prompt_injection: 'Unable to determine refinement due to verification error',
-          },
-        };
-      } else {
-        return this.createOutput(
-          {
-            verified: false,
-            checks: [],
-            issuesFound: 1,
-            recommendations: ['Verification failed due to error'],
-          },
-          0.3,
-          { error: error instanceof Error ? error.message : 'Unknown error' },
-          (input as AgentInput).reflexionLoop || 0
-        );
-      }
+      // Return safe fallback as AgentOutput
+      return this.createOutput(
+        {
+          verified: false,
+          checks: [],
+          issuesFound: 1,
+          recommendations: ['Verification failed due to error'],
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        0.3,
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        input.reflexionLoop || 0
+      );
     }
   }
 

@@ -100,27 +100,23 @@ export class ConductorAgent {
       },
     };
 
-    const verifiedOutput = await this.verifier.execute(verifierInput);
+    // Cast to AgentInput to satisfy type system (verifier uses duck typing internally)
+    const verifiedOutput = await this.verifier.execute(verifierInput as unknown as AgentInput);
 
-    // Wrap VerifierOutput as AgentOutput for compatibility
-    const wrappedVerifiedOutput: AgentOutput = {
-      type: 'VERIFIER',
-      result: verifiedOutput,
-      confidence: 'confidence_score' in verifiedOutput ? verifiedOutput.confidence_score : 0.5,
-      reflexionLoop: 0,
-    };
-
+    // Note: verifiedOutput is AgentOutput wrapping VerifierOutput in result
+    // The confidence is mapped from VerifierOutput.confidence_score
+    
     // Log agent actions
     await this.logAgentActions(context.interviewId, [
       analyzedOutput,
       taggedOutput,
-      wrappedVerifiedOutput,
+      verifiedOutput,
     ]);
 
     return {
       analyzed: analyzedOutput,
       tagged: taggedOutput,
-      verified: wrappedVerifiedOutput,
+      verified: verifiedOutput,
     };
   }
 
