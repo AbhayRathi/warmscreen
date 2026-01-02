@@ -95,7 +95,11 @@ export class VerifierAgent extends BaseAgent {
 
   /**
    * Main execution method with error handling (addresses Issue #2)
-   * Supports both new VerifierInput and legacy AgentInput
+   * Supports both new VerifierInput and legacy AgentInput for backward compatibility
+   * 
+   * @param input - Either VerifierInput (new three-stage format) or AgentInput (legacy format)
+   * @returns VerifierOutput with three-stage verification results or legacy AgentOutput
+   * @throws Never throws - returns safe fallback on errors
    */
   async execute(input: VerifierInput | AgentInput): Promise<VerifierOutput | AgentOutput> {
     try {
@@ -137,6 +141,9 @@ export class VerifierAgent extends BaseAgent {
   /**
    * Type guard to check if input is VerifierInput
    * Returns false for malformed inputs to allow proper error handling
+   * 
+   * @param input - Input to check
+   * @returns true if input matches VerifierInput interface
    */
   private isVerifierInput(input: VerifierInput | AgentInput): input is VerifierInput {
     try {
@@ -156,7 +163,11 @@ export class VerifierAgent extends BaseAgent {
   }
 
   /**
-   * Input validation (addresses Issue #1)
+   * Input validation (addresses Issue #1 - Critical)
+   * Validates all required fields and types in VerifierInput
+   * 
+   * @param input - VerifierInput to validate
+   * @throws Error if validation fails with descriptive message
    */
   private validateInput(input: VerifierInput): void {
     // Validate transcript
@@ -229,6 +240,14 @@ export class VerifierAgent extends BaseAgent {
 
   /**
    * Execute three-stage verification with new format
+   * 
+   * Performs sequential verification:
+   * 1. Consistency Check - Detects score-tag misalignment and agent disagreement
+   * 2. Factual Audit - Validates technical accuracy and concept coverage
+   * 3. Reflexion Decision - Generates confidence score and recommendations
+   * 
+   * @param input - Validated VerifierInput
+   * @returns VerifierOutput with verification results and recommendations
    */
   private async executeVerification(input: VerifierInput): Promise<VerifierOutput> {
     // Validate input first
@@ -253,6 +272,13 @@ export class VerifierAgent extends BaseAgent {
   /**
    * Stage 1: Consistency Check
    * Detects score-tag misalignment and agent disagreement
+   * 
+   * Checks:
+   * - High scores (>0.8) conflicting with negative tags
+   * - Confidence differences >0.2 between agents
+   * 
+   * @param input - VerifierInput with agent outputs
+   * @returns Consistency check results with issues and penalties
    */
   private performConsistencyCheck(input: VerifierInput): {
     passed: boolean;
@@ -298,6 +324,14 @@ export class VerifierAgent extends BaseAgent {
   /**
    * Stage 2: Factual Audit
    * Validates technical accuracy and concept coverage
+   * 
+   * Checks:
+   * - Empty or very short transcripts
+   * - Factual contradictions using negation pattern detection
+   * - Concept coverage with related term matching
+   * 
+   * @param input - VerifierInput with transcript and context knowledge
+   * @returns Factual audit results with issues and penalties
    */
   private performFactualAudit(input: VerifierInput): {
     passed: boolean;
@@ -342,7 +376,13 @@ export class VerifierAgent extends BaseAgent {
   }
 
   /**
-   * Detect factual errors using negation pattern detection
+   * Detect factual errors using negation pattern detection (addresses Issue #10)
+   * 
+   * Detects contradictions like "doesn't use X" when X is expected
+   * 
+   * @param transcriptLower - Lowercased transcript for matching
+   * @param keyFacts - Expected facts that should not be contradicted
+   * @returns Array of error messages for detected contradictions
    */
   private detectFactualErrors(transcriptLower: string, keyFacts: string[]): string[] {
     const errors: string[] = [];
@@ -378,6 +418,12 @@ export class VerifierAgent extends BaseAgent {
 
   /**
    * Calculate concept coverage with related term matching
+   * 
+   * Checks if expected concepts or their related terms appear in transcript
+   * 
+   * @param transcriptLower - Lowercased transcript for matching
+   * @param expectedConcepts - Concepts that should be covered
+   * @returns Coverage score (0.0-1.0)
    */
   private calculateConceptCoverage(transcriptLower: string, expectedConcepts: string[]): number {
     if (expectedConcepts.length === 0) {
@@ -412,6 +458,15 @@ export class VerifierAgent extends BaseAgent {
   /**
    * Stage 3: Reflexion Decision
    * Generate confidence score and recommendations
+   * 
+   * Calculates overall confidence (1.0 - total penalties)
+   * Determines which agent needs refinement based on detected issues
+   * Builds structured critique with Chain of Thought reasoning
+   * 
+   * @param input - Original VerifierInput
+   * @param consistencyResult - Results from Stage 1
+   * @param factualResult - Results from Stage 2
+   * @returns VerifierOutput with confidence, decisions, and recommendations
    */
   private generateReflexionDecision(
     input: VerifierInput,
@@ -468,6 +523,15 @@ export class VerifierAgent extends BaseAgent {
 
   /**
    * Build detailed critique reasoning (Chain of Thought)
+   * 
+   * Generates structured markdown output showing all three verification stages
+   * 
+   * @param input - Original VerifierInput
+   * @param consistencyPassed - Did Stage 1 pass?
+   * @param factualPassed - Did Stage 2 pass?
+   * @param issues - All detected issues
+   * @param confidenceScore - Final confidence score
+   * @returns Formatted critique with verification analysis
    */
   private buildCritiqueReasoning(
     input: VerifierInput,
@@ -517,6 +581,10 @@ export class VerifierAgent extends BaseAgent {
 
   /**
    * Legacy execution path for backward compatibility
+   * Maintains existing behavior for AgentInput format
+   * 
+   * @param input - Legacy AgentInput
+   * @returns Legacy AgentOutput with verification results
    */
   private async executeLegacy(input: AgentInput): Promise<AgentOutput> {
     const { context, previousOutput, reflexionLoop = 0 } = input;

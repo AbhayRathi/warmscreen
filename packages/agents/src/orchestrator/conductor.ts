@@ -6,6 +6,7 @@ import {
   ScorerAgent, 
   NarratorAgent 
 } from '../agents';
+import { VerifierInput } from '../agents/verifier';
 import { AgentOutput, AgentType } from '@warmscreen/shared';
 import { PrismaClient } from '@warmscreen/database';
 
@@ -41,6 +42,9 @@ export class ConductorAgent {
     transcript: string;
     questionCategory: string;
     position: string;
+    questionText?: string;
+    expectedConcepts?: string[];
+    keyFacts?: string[];
   }): Promise<{
     analyzed: AgentOutput;
     tagged: AgentOutput;
@@ -65,26 +69,134 @@ export class ConductorAgent {
       },
     });
 
-    // Step 3: Verifier verifies both outputs
-    const verifiedOutput = await this.verifier.execute({
-      type: 'VERIFIER',
-      context: {
-        agentOutputs: [analyzedOutput, taggedOutput],
+    // Step 3: Generate a basic score for this individual response
+    // (Note: Final scoring happens in finalizeInterview)
+    const responseScore = this.calculateResponseScore(analyzedOutput, taggedOutput);
+
+    // Step 4: Verifier verifies all outputs using new three-stage verification (Issue #4 - CRITICAL)
+    const verifierInput: VerifierInput = {
+      candidateTranscript: context.transcript,
+      question: context.questionText || `Question about ${context.questionCategory}`,
+      contextKnowledge: {
+        expectedConcepts: context.expectedConcepts || this.getDefaultConcepts(context.questionCategory),
+        idealResponseCharacteristics: ['clear', 'detailed', 'accurate'],
+        keyFacts: context.keyFacts || [],
       },
-    });
+      agentOutputs: {
+        analyzer: {
+          score: this.extractAnalyzerScore(analyzedOutput),
+          confidence: analyzedOutput.confidence,
+          insights: this.extractAnalyzerInsights(analyzedOutput),
+        },
+        tagger: {
+          tags: this.extractTaggerTags(taggedOutput),
+          confidence: taggedOutput.confidence,
+        },
+        scorer: {
+          overallScore: responseScore.score,
+          confidence: responseScore.confidence,
+          breakdown: responseScore.breakdown,
+        },
+      },
+    };
+
+    const verifiedOutput = await this.verifier.execute(verifierInput);
+
+    // Wrap VerifierOutput as AgentOutput for compatibility
+    const wrappedVerifiedOutput: AgentOutput = {
+      type: 'VERIFIER',
+      result: verifiedOutput,
+      confidence: 'confidence_score' in verifiedOutput ? verifiedOutput.confidence_score : 0.5,
+      reflexionLoop: 0,
+    };
 
     // Log agent actions
     await this.logAgentActions(context.interviewId, [
       analyzedOutput,
       taggedOutput,
-      verifiedOutput,
+      wrappedVerifiedOutput,
     ]);
 
     return {
       analyzed: analyzedOutput,
       tagged: taggedOutput,
-      verified: verifiedOutput,
+      verified: wrappedVerifiedOutput,
     };
+  }
+
+  /**
+   * Extract analyzer score from output
+   */
+  private extractAnalyzerScore(output: AgentOutput): number {
+    if (output.result.scores) {
+      const scores = Object.values(output.result.scores) as number[];
+      return scores.reduce((a: number, b: number) => a + b, 0) / scores.length / 10; // Normalize to 0-1
+    }
+    return 0.5; // Default
+  }
+
+  /**
+   * Extract analyzer insights from output
+   */
+  private extractAnalyzerInsights(output: AgentOutput): string[] {
+    if (output.result.insights) {
+      return Array.isArray(output.result.insights) ? output.result.insights : [output.result.insights];
+    }
+    if (output.result.analysis) {
+      return [output.result.analysis];
+    }
+    return ['Analysis completed'];
+  }
+
+  /**
+   * Extract tagger tags from output
+   */
+  private extractTaggerTags(output: AgentOutput): string[] {
+    if (output.result.tags) {
+      return output.result.tags;
+    }
+    if (output.result.skillTags && output.result.behavioralTags) {
+      return [...output.result.skillTags, ...output.result.behavioralTags];
+    }
+    return [];
+  }
+
+  /**
+   * Calculate basic response score for verification
+   */
+  private calculateResponseScore(analyzedOutput: AgentOutput, taggedOutput: AgentOutput): {
+    score: number;
+    confidence: number;
+    breakdown: any;
+  } {
+    const analyzerScore = this.extractAnalyzerScore(analyzedOutput);
+    const taggerScore = taggedOutput.confidence;
+    
+    const score = (analyzerScore * 0.6 + taggerScore * 0.4);
+    const confidence = (analyzedOutput.confidence + taggedOutput.confidence) / 2;
+    
+    return {
+      score,
+      confidence,
+      breakdown: {
+        analyzer: analyzerScore,
+        tagger: taggerScore,
+      },
+    };
+  }
+
+  /**
+   * Get default expected concepts based on question category
+   */
+  private getDefaultConcepts(category: string): string[] {
+    const conceptMap: Record<string, string[]> = {
+      technical: ['algorithm', 'data structure', 'complexity', 'optimization'],
+      behavioral: ['teamwork', 'leadership', 'communication', 'problem-solving'],
+      system_design: ['scalability', 'architecture', 'trade-offs', 'design patterns'],
+      coding: ['syntax', 'logic', 'testing', 'debugging'],
+    };
+    
+    return conceptMap[category.toLowerCase()] || ['knowledge', 'understanding', 'clarity'];
   }
 
   /**
