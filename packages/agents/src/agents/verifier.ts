@@ -89,6 +89,20 @@ export class VerifierAgent extends BaseAgent {
     'inadequate',
   ] as const;
 
+  private static readonly NEGATION_PATTERNS = [
+    'not {}',
+    'no {}',
+    'never {}',
+    "isn't {}",
+    "doesn't {}",
+    "don't {}",
+    'cannot {}',
+    "can't {}",
+    "doesn't use {}",
+    'does not use {}',
+    'not using {}',
+  ] as const;
+
   constructor() {
     super('VERIFIER');
   }
@@ -124,27 +138,25 @@ export class VerifierAgent extends BaseAgent {
    * Main execution method - Overrides BaseAgent.execute()
    * Routes to appropriate verification method based on input type
    * 
-   * @param input - AgentInput (supports both legacy and VerifierInput via duck typing)
+   * @param input - AgentInput or VerifierInput (duck typing compatible)
    * @returns AgentOutput (wraps VerifierOutput when using new format)
    * @throws Never throws - returns safe fallback on errors
    */
-  async execute(input: AgentInput): Promise<AgentOutput> {
+  async execute(input: AgentInput | Record<string, any>): Promise<AgentOutput> {
     try {
-      // Cast to union type for internal routing
-      const unionInput = input as AgentInput | VerifierInput;
-      
-      if (this.isVerifierInput(unionInput)) {
-        const verifierOutput = await this.executeVerification(unionInput);
+      // Type guard determines routing
+      if (this.isVerifierInput(input)) {
+        const verifierOutput = await this.executeVerification(input as VerifierInput);
         // Wrap as AgentOutput for base class compatibility
         return {
           type: this.type,
           result: verifierOutput,
           confidence: verifierOutput.confidence_score,
-          reflexionLoop: input.reflexionLoop || 0,
+          reflexionLoop: (input as any).reflexionLoop || 0,
           shouldReflect: verifierOutput.reflexion_required,
         };
       }
-      return await this.executeLegacy(input);
+      return await this.executeLegacy(input as AgentInput);
     } catch (error) {
       console.error('[VerifierAgent] Execution failed:', error);
       // Return safe fallback as AgentOutput
@@ -158,7 +170,7 @@ export class VerifierAgent extends BaseAgent {
         },
         0.3,
         { error: error instanceof Error ? error.message : 'Unknown error' },
-        input.reflexionLoop || 0
+        (input as AgentInput).reflexionLoop || 0
       );
     }
   }
@@ -170,7 +182,7 @@ export class VerifierAgent extends BaseAgent {
    * @param input - Input to check
    * @returns true if input matches VerifierInput interface
    */
-  private isVerifierInput(input: VerifierInput | AgentInput): input is VerifierInput {
+  private isVerifierInput(input: AgentInput | Record<string, any>): input is VerifierInput {
     try {
       return (
         'candidateTranscript' in input &&
@@ -415,24 +427,11 @@ export class VerifierAgent extends BaseAgent {
     for (const fact of keyFacts) {
       const factLower = fact.toLowerCase();
       
-      // Improved negation pattern detection (addresses Issue #10)
-      const negationPatterns = [
-        `not ${factLower}`,
-        `no ${factLower}`,
-        `never ${factLower}`,
-        `isn't ${factLower}`,
-        `doesn't ${factLower}`,
-        `don't ${factLower}`,
-        `cannot ${factLower}`,
-        `can't ${factLower}`,
-        `doesn't use ${factLower}`,
-        `does not use ${factLower}`,
-        `not using ${factLower}`,
-      ];
-
-      for (const pattern of negationPatterns) {
-        if (transcriptLower.includes(pattern)) {
-          errors.push(`Factual contradiction detected: "${pattern}" contradicts expected knowledge`);
+      // Use the class constant instead of inline patterns
+      for (const pattern of VerifierAgent.NEGATION_PATTERNS) {
+        const negatedPhrase = pattern.replace('{}', factLower);
+        if (transcriptLower.includes(negatedPhrase)) {
+          errors.push(`Factual contradiction detected: "${negatedPhrase}" contradicts expected knowledge`);
           break; // Only report one error per fact
         }
       }

@@ -8,7 +8,8 @@ export abstract class BaseAgent {
     this.type = type;
   }
 
-  abstract execute(input: AgentInput): Promise<AgentOutput>;
+  // Accept AgentInput or any duck-typed compatible input
+  abstract execute(input: AgentInput | Record<string, any>): Promise<AgentOutput>;
 
   protected async reflect(output: AgentOutput, input: AgentInput): Promise<AgentOutput> {
     // Base reflexion logic - subclasses can override

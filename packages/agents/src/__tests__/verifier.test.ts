@@ -524,4 +524,105 @@ describe('VerifierAgent Three-Stage Verification', () => {
       expect(result.critique_reasoning).toContain('Reflexion Decision');
     });
   });
+
+  describe('Boundary Cases', () => {
+    it('should handle negative scores gracefully', async () => {
+      const input: VerifierInput = {
+        candidateTranscript: 'React uses one-way data binding through props.',
+        question: 'Explain data binding in React',
+        contextKnowledge: {
+          expectedConcepts: ['one-way binding', 'props'],
+          keyFacts: ['one-way binding'],
+        },
+        agentOutputs: {
+          analyzer: { score: -0.5, confidence: 0.9, insights: ['Good'] },
+          tagger: { tags: ['react'], confidence: 0.8 },
+          scorer: { overallScore: -0.3, confidence: 0.7 },
+        },
+      };
+
+      const result = await verifier.executeWithVerifierInput(input);
+      expect(result.confidence_score).toBeGreaterThanOrEqual(0);
+      expect(result.confidence_score).toBeLessThanOrEqual(1);
+    });
+
+    it('should handle scores > 1.0 gracefully', async () => {
+      const input: VerifierInput = {
+        candidateTranscript: 'React uses one-way data binding through props.',
+        question: 'Explain data binding in React',
+        contextKnowledge: {
+          expectedConcepts: ['one-way binding', 'props'],
+          keyFacts: ['one-way binding'],
+        },
+        agentOutputs: {
+          analyzer: { score: 1.5, confidence: 1.2, insights: ['Good'] },
+          tagger: { tags: ['react'], confidence: 1.8 },
+          scorer: { overallScore: 2.0, confidence: 1.5 },
+        },
+      };
+
+      const result = await verifier.executeWithVerifierInput(input);
+      expect(result.confidence_score).toBeLessThanOrEqual(1);
+    });
+
+    it('should handle empty arrays in agentOutputs', async () => {
+      const input: VerifierInput = {
+        candidateTranscript: 'React uses one-way data binding.',
+        question: 'Explain data binding',
+        contextKnowledge: {
+          expectedConcepts: [],
+          keyFacts: [],
+        },
+        agentOutputs: {
+          analyzer: { score: 0.8, confidence: 0.9, insights: [] },
+          tagger: { tags: [], confidence: 0.8 },
+          scorer: { overallScore: 0.8, confidence: 0.9 },
+        },
+      };
+
+      const result = await verifier.executeWithVerifierInput(input);
+      expect(result).toBeDefined();
+      expect(result.confidence_score).toBeGreaterThan(0);
+    });
+
+    it('should handle very large transcripts', async () => {
+      const largeTranscript = 'React '.repeat(1000) + 'uses one-way data binding through props.';
+      const input: VerifierInput = {
+        candidateTranscript: largeTranscript,
+        question: 'Explain data binding',
+        contextKnowledge: {
+          expectedConcepts: ['one-way binding'],
+          keyFacts: ['one-way binding'],
+        },
+        agentOutputs: {
+          analyzer: { score: 0.8, confidence: 0.9, insights: ['Good'] },
+          tagger: { tags: ['react'], confidence: 0.8 },
+          scorer: { overallScore: 0.8, confidence: 0.9 },
+        },
+      };
+
+      const result = await verifier.executeWithVerifierInput(input);
+      expect(result).toBeDefined();
+      expect(result.confidence_score).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should handle special characters and Unicode', async () => {
+      const input: VerifierInput = {
+        candidateTranscript: 'React 使用单向数据绑定 🚀 через props.',
+        question: 'Explain data binding',
+        contextKnowledge: {
+          expectedConcepts: ['one-way binding'],
+          keyFacts: ['one-way binding'],
+        },
+        agentOutputs: {
+          analyzer: { score: 0.8, confidence: 0.9, insights: ['Good'] },
+          tagger: { tags: ['react'], confidence: 0.8 },
+          scorer: { overallScore: 0.8, confidence: 0.9 },
+        },
+      };
+
+      const result = await verifier.executeWithVerifierInput(input);
+      expect(result).toBeDefined();
+    });
+  });
 });
