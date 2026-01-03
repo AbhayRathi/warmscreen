@@ -1,6 +1,7 @@
 import { BaseAgent } from './base-agent';
 import { AgentInput, AgentOutput } from '@warmscreen/shared';
 
+// Legacy interfaces for backward compatibility
 export interface VerificationCheck {
   name: string;
   passed: boolean;
@@ -14,16 +15,602 @@ export interface VerificationResult {
   recommendations: string[];
 }
 
+// New three-stage verification interfaces
+export interface VerifierInput {
+  candidateTranscript: string;
+  question: string;
+  contextKnowledge: {
+    expectedConcepts: string[];
+    idealResponseCharacteristics?: string[];
+    keyFacts?: string[];
+  };
+  agentOutputs: {
+    analyzer: { score: number; confidence: number; insights: string[] };
+    tagger: { tags: string[]; confidence: number };
+    scorer: { overallScore: number; confidence: number; breakdown?: any };
+  };
+}
+
+export interface VerifierOutput {
+  confidence_score: number;        // 0.0-1.0 overall confidence
+  is_consistent: boolean;          // Passed consistency check?
+  is_accurate: boolean;            // Passed factual audit?
+  reflexion_required: boolean;     // Should trigger agent re-run?
+  critique_reasoning: string;      // Detailed CoT explanation
+  recommended_refinement: {
+    agent_to_refine: 'Analyzer' | 'Tagger' | 'Scorer' | 'None';
+    critique_prompt_injection: string;  // Instruction for re-run
+  };
+}
+
 /**
  * Verifier Agent
- * Verifies the accuracy and consistency of other agents' outputs
+ * Performs three-stage verification of agent outputs:
+ * 1. Consistency Check - Score-tag alignment and agent agreement
+ * 2. Factual Audit - Technical accuracy and concept coverage
+ * 3. Reflexion Decision - Generate recommendations and confidence score
  */
 export class VerifierAgent extends BaseAgent {
+  // Extract magic numbers to constants (addresses Issue #8)
+  private static readonly CONFIDENCE_PENALTIES = {
+    SCORE_TAG_MISALIGNMENT: 0.35,
+    AGENT_DISAGREEMENT_BASE: 0.15,
+    FACTUAL_ERROR: 0.3,
+    LOW_COVERAGE_MULTIPLIER: 0.1,
+    SHORT_TRANSCRIPT: 0.3,
+    EMPTY_TRANSCRIPT: 0.7,
+  } as const;
+
+  private static readonly THRESHOLDS = {
+    HIGH_SCORE: 0.8,
+    LOW_CONFIDENCE: 0.8,
+    AGENT_DISAGREEMENT: 0.2,
+    SHORT_TRANSCRIPT_LENGTH: 50,
+  } as const;
+
+  // Move to class constant (addresses Issue #6)
+  private static readonly RELATED_TERMS: Record<string, string[]> = {
+    'one-way binding': ['unidirectional', 'one way', 'single direction', 'props down'],
+    'two-way binding': ['bidirectional', 'two way', 'both directions', 'mutable'],
+    'component': ['widget', 'element', 'module'],
+    'state': ['data', 'variables', 'properties'],
+    'props': ['properties', 'attributes', 'parameters'],
+  } as const;
+
+  private static readonly NEGATIVE_TAGS = [
+    'confused',
+    'incorrect',
+    'vague',
+    'incomplete',
+    'off-topic',
+    'rambling',
+    'poor',
+    'weak',
+    'inadequate',
+  ] as const;
+
+  private static readonly NEGATION_PATTERNS = [
+    'not {}',
+    'no {}',
+    'never {}',
+    "isn't {}",
+    "doesn't {}",
+    "don't {}",
+    'cannot {}',
+    "can't {}",
+    "doesn't use {}",
+    'does not use {}',
+    'not using {}',
+  ] as const;
+
   constructor() {
     super('VERIFIER');
   }
 
-  async execute(input: AgentInput): Promise<AgentOutput> {
+  /**
+   * Execute verification with VerifierInput format
+   * Returns VerifierOutput directly for type safety
+   * 
+   * @param input - VerifierInput with three-stage verification data
+   * @returns VerifierOutput with verification results
+   */
+  async executeWithVerifierInput(input: VerifierInput): Promise<VerifierOutput> {
+    try {
+      return await this.executeVerification(input);
+    } catch (error) {
+      console.error('[VerifierAgent] Execution failed:', error);
+      // Return safe fallback as VerifierOutput
+      return {
+        confidence_score: 0.3,
+        is_consistent: false,
+        is_accurate: false,
+        reflexion_required: true,
+        critique_reasoning: `Verification failed due to error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        recommended_refinement: {
+          agent_to_refine: 'None',
+          critique_prompt_injection: 'Unable to determine refinement due to verification error',
+        },
+      };
+    }
+  }
+
+  /**
+   * Main execution method - Overrides BaseAgent.execute()
+   * Routes to appropriate verification method based on input type
+   * 
+   * @param input - AgentInput or VerifierInput (duck typing compatible)
+   * @returns AgentOutput (wraps VerifierOutput when using new format)
+   * @throws Never throws - returns safe fallback on errors
+   */
+  async execute(input: AgentInput | Record<string, any>): Promise<AgentOutput> {
+    try {
+      // Type guard determines routing
+      if (this.isVerifierInput(input)) {
+        const verifierOutput = await this.executeVerification(input as VerifierInput);
+        // Wrap as AgentOutput for base class compatibility
+        return {
+          type: this.type,
+          result: verifierOutput,
+          confidence: verifierOutput.confidence_score,
+          reflexionLoop: (input as any).reflexionLoop || 0,
+          shouldReflect: verifierOutput.reflexion_required,
+        };
+      }
+      return await this.executeLegacy(input as AgentInput);
+    } catch (error) {
+      console.error('[VerifierAgent] Execution failed:', error);
+      // Return safe fallback as AgentOutput
+      return this.createOutput(
+        {
+          verified: false,
+          checks: [],
+          issuesFound: 1,
+          recommendations: ['Verification failed due to error'],
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        0.3,
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        (input as AgentInput).reflexionLoop || 0
+      );
+    }
+  }
+
+  /**
+   * Type guard to check if input is VerifierInput
+   * Returns false for malformed inputs to allow proper error handling
+   * 
+   * @param input - Input to check
+   * @returns true if input matches VerifierInput interface
+   */
+  private isVerifierInput(input: AgentInput | Record<string, any>): input is VerifierInput {
+    try {
+      return (
+        'candidateTranscript' in input &&
+        'question' in input &&
+        'contextKnowledge' in input &&
+        'agentOutputs' in input &&
+        typeof (input as VerifierInput).agentOutputs === 'object' &&
+        'analyzer' in (input as VerifierInput).agentOutputs &&
+        'tagger' in (input as VerifierInput).agentOutputs &&
+        'scorer' in (input as VerifierInput).agentOutputs
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Input validation (addresses Issue #1 - Critical)
+   * Validates all required fields and types in VerifierInput
+   * 
+   * @param input - VerifierInput to validate
+   * @throws Error if validation fails with descriptive message
+   */
+  private validateInput(input: VerifierInput): void {
+    // Validate transcript
+    if (typeof input.candidateTranscript !== 'string') {
+      throw new Error('Invalid input: candidateTranscript must be a string');
+    }
+
+    // Validate question
+    if (typeof input.question !== 'string') {
+      throw new Error('Invalid input: question must be a string');
+    }
+
+    // Validate contextKnowledge
+    if (!input.contextKnowledge || typeof input.contextKnowledge !== 'object') {
+      throw new Error('Invalid input: contextKnowledge must be an object');
+    }
+
+    if (!Array.isArray(input.contextKnowledge.expectedConcepts)) {
+      throw new Error('Invalid contextKnowledge: expectedConcepts must be an array');
+    }
+
+    // Validate agentOutputs structure
+    if (!input.agentOutputs || typeof input.agentOutputs !== 'object') {
+      throw new Error('Invalid input: agentOutputs must be an object');
+    }
+
+    // Validate analyzer output
+    if (!input.agentOutputs.analyzer || typeof input.agentOutputs.analyzer !== 'object') {
+      throw new Error('Invalid agentOutputs: missing or invalid analyzer output');
+    }
+
+    if (typeof input.agentOutputs.analyzer.score !== 'number') {
+      throw new Error('Invalid analyzer output: score must be a number');
+    }
+
+    if (typeof input.agentOutputs.analyzer.confidence !== 'number') {
+      throw new Error('Invalid analyzer output: confidence must be a number');
+    }
+
+    if (!Array.isArray(input.agentOutputs.analyzer.insights)) {
+      throw new Error('Invalid analyzer output: insights must be an array');
+    }
+
+    // Validate tagger output
+    if (!input.agentOutputs.tagger || typeof input.agentOutputs.tagger !== 'object') {
+      throw new Error('Invalid agentOutputs: missing or invalid tagger output');
+    }
+
+    if (!Array.isArray(input.agentOutputs.tagger.tags)) {
+      throw new Error('Invalid tagger output: tags must be an array');
+    }
+
+    if (typeof input.agentOutputs.tagger.confidence !== 'number') {
+      throw new Error('Invalid tagger output: confidence must be a number');
+    }
+
+    // Validate scorer output
+    if (!input.agentOutputs.scorer || typeof input.agentOutputs.scorer !== 'object') {
+      throw new Error('Invalid agentOutputs: missing or invalid scorer output');
+    }
+
+    if (typeof input.agentOutputs.scorer.overallScore !== 'number') {
+      throw new Error('Invalid scorer output: overallScore must be a number');
+    }
+
+    if (typeof input.agentOutputs.scorer.confidence !== 'number') {
+      throw new Error('Invalid scorer output: confidence must be a number');
+    }
+  }
+
+  /**
+   * Execute three-stage verification with new format
+   * 
+   * Performs sequential verification:
+   * 1. Consistency Check - Detects score-tag misalignment and agent disagreement
+   * 2. Factual Audit - Validates technical accuracy and concept coverage
+   * 3. Reflexion Decision - Generates confidence score and recommendations
+   * 
+   * @param input - Validated VerifierInput
+   * @returns VerifierOutput with verification results and recommendations
+   */
+  private async executeVerification(input: VerifierInput): Promise<VerifierOutput> {
+    // Validate input first
+    this.validateInput(input);
+
+    // Stage 1: Consistency Check
+    const consistencyResult = this.performConsistencyCheck(input);
+
+    // Stage 2: Factual Audit
+    const factualResult = this.performFactualAudit(input);
+
+    // Stage 3: Reflexion Decision
+    const reflexionResult = this.generateReflexionDecision(
+      input,
+      consistencyResult,
+      factualResult
+    );
+
+    return reflexionResult;
+  }
+
+  /**
+   * Stage 1: Consistency Check
+   * Detects score-tag misalignment and agent disagreement
+   * 
+   * Checks:
+   * - High scores (>0.8) conflicting with negative tags
+   * - Confidence differences >0.2 between agents
+   * 
+   * @param input - VerifierInput with agent outputs
+   * @returns Consistency check results with issues and penalties
+   */
+  private performConsistencyCheck(input: VerifierInput): {
+    passed: boolean;
+    issues: string[];
+    penalties: number;
+  } {
+    const issues: string[] = [];
+    let penalties = 0;
+
+    // Check score-tag alignment
+    const { analyzer, tagger, scorer } = input.agentOutputs;
+    const highScore = scorer.overallScore > VerifierAgent.THRESHOLDS.HIGH_SCORE;
+    
+    // Check if high score conflicts with negative tags (addresses Issue #7)
+    const hasNegativeTags = tagger.tags.some(tag => 
+      VerifierAgent.NEGATIVE_TAGS.some(negTag => 
+        tag.toLowerCase().includes(negTag)
+      )
+    );
+
+    if (highScore && hasNegativeTags) {
+      issues.push('Score-tag misalignment: High score with negative tags detected');
+      penalties += VerifierAgent.CONFIDENCE_PENALTIES.SCORE_TAG_MISALIGNMENT;
+    }
+
+    // Check agent agreement (confidence differences)
+    const confidences = [analyzer.confidence, tagger.confidence, scorer.confidence];
+    const maxConfidence = Math.max(...confidences);
+    const minConfidence = Math.min(...confidences);
+    
+    if (maxConfidence - minConfidence > VerifierAgent.THRESHOLDS.AGENT_DISAGREEMENT) {
+      issues.push(`Agent disagreement: Confidence range ${(maxConfidence - minConfidence).toFixed(2)}`);
+      penalties += VerifierAgent.CONFIDENCE_PENALTIES.AGENT_DISAGREEMENT_BASE;
+    }
+
+    return {
+      passed: issues.length === 0,
+      issues,
+      penalties,
+    };
+  }
+
+  /**
+   * Stage 2: Factual Audit
+   * Validates technical accuracy and concept coverage
+   * 
+   * Checks:
+   * - Empty or very short transcripts
+   * - Factual contradictions using negation pattern detection
+   * - Concept coverage with related term matching
+   * 
+   * @param input - VerifierInput with transcript and context knowledge
+   * @returns Factual audit results with issues and penalties
+   */
+  private performFactualAudit(input: VerifierInput): {
+    passed: boolean;
+    issues: string[];
+    penalties: number;
+  } {
+    const issues: string[] = [];
+    let penalties = 0;
+
+    // Cache lowercased strings (addresses Issue #5)
+    const transcriptLower = input.candidateTranscript.toLowerCase();
+    const expectedConcepts = input.contextKnowledge.expectedConcepts;
+
+    // Check for empty or very short transcript first
+    if (input.candidateTranscript.trim().length === 0) {
+      issues.push('Empty transcript - no content to verify');
+      penalties += VerifierAgent.CONFIDENCE_PENALTIES.EMPTY_TRANSCRIPT;
+    } else if (input.candidateTranscript.length < VerifierAgent.THRESHOLDS.SHORT_TRANSCRIPT_LENGTH) {
+      issues.push('Very short transcript may lack sufficient detail');
+      penalties += VerifierAgent.CONFIDENCE_PENALTIES.SHORT_TRANSCRIPT;
+    }
+
+    // Check for factual contradictions with negation detection
+    const factualErrors = this.detectFactualErrors(transcriptLower, input.contextKnowledge.keyFacts || []);
+    if (factualErrors.length > 0) {
+      issues.push(...factualErrors);
+      penalties += VerifierAgent.CONFIDENCE_PENALTIES.FACTUAL_ERROR;
+    }
+
+    // Check concept coverage with related terms
+    const coverageScore = this.calculateConceptCoverage(transcriptLower, expectedConcepts);
+    if (coverageScore < 0.5) {
+      issues.push(`Low concept coverage: ${(coverageScore * 100).toFixed(0)}% of expected concepts mentioned`);
+      penalties += (1 - coverageScore) * VerifierAgent.CONFIDENCE_PENALTIES.LOW_COVERAGE_MULTIPLIER;
+    }
+
+    return {
+      passed: factualErrors.length === 0 && coverageScore >= 0.5 && input.candidateTranscript.trim().length > 0,
+      issues,
+      penalties,
+    };
+  }
+
+  /**
+   * Detect factual errors using negation pattern detection (addresses Issue #10)
+   * 
+   * Detects contradictions like "doesn't use X" when X is expected
+   * 
+   * @param transcriptLower - Lowercased transcript for matching
+   * @param keyFacts - Expected facts that should not be contradicted
+   * @returns Array of error messages for detected contradictions
+   */
+  private detectFactualErrors(transcriptLower: string, keyFacts: string[]): string[] {
+    const errors: string[] = [];
+
+    for (const fact of keyFacts) {
+      const factLower = fact.toLowerCase();
+      
+      // Use the class constant instead of inline patterns
+      for (const pattern of VerifierAgent.NEGATION_PATTERNS) {
+        const negatedPhrase = pattern.replace('{}', factLower);
+        if (transcriptLower.includes(negatedPhrase)) {
+          errors.push(`Factual contradiction detected: "${negatedPhrase}" contradicts expected knowledge`);
+          break; // Only report one error per fact
+        }
+      }
+    }
+
+    return errors;
+  }
+
+  /**
+   * Calculate concept coverage with related term matching
+   * 
+   * Checks if expected concepts or their related terms appear in transcript
+   * 
+   * @param transcriptLower - Lowercased transcript for matching
+   * @param expectedConcepts - Concepts that should be covered
+   * @returns Coverage score (0.0-1.0)
+   */
+  private calculateConceptCoverage(transcriptLower: string, expectedConcepts: string[]): number {
+    if (expectedConcepts.length === 0) {
+      return 1.0; // No concepts to check
+    }
+
+    let coveredCount = 0;
+
+    for (const concept of expectedConcepts) {
+      const conceptLower = concept.toLowerCase();
+      
+      // Check if concept is mentioned directly
+      if (transcriptLower.includes(conceptLower)) {
+        coveredCount++;
+        continue;
+      }
+
+      // Check related terms
+      const relatedTerms = VerifierAgent.RELATED_TERMS[conceptLower] || [];
+      const hasRelatedTerm = relatedTerms.some(term => 
+        transcriptLower.includes(term.toLowerCase())
+      );
+
+      if (hasRelatedTerm) {
+        coveredCount++;
+      }
+    }
+
+    return coveredCount / expectedConcepts.length;
+  }
+
+  /**
+   * Stage 3: Reflexion Decision
+   * Generate confidence score and recommendations
+   * 
+   * Calculates overall confidence (1.0 - total penalties)
+   * Determines which agent needs refinement based on detected issues
+   * Builds structured critique with Chain of Thought reasoning
+   * 
+   * @param input - Original VerifierInput
+   * @param consistencyResult - Results from Stage 1
+   * @param factualResult - Results from Stage 2
+   * @returns VerifierOutput with confidence, decisions, and recommendations
+   */
+  private generateReflexionDecision(
+    input: VerifierInput,
+    consistencyResult: { passed: boolean; issues: string[]; penalties: number },
+    factualResult: { passed: boolean; issues: string[]; penalties: number }
+  ): VerifierOutput {
+    // Calculate confidence score
+    const totalPenalties = consistencyResult.penalties + factualResult.penalties;
+    const confidenceScore = Math.max(0, Math.min(1, 1.0 - totalPenalties));
+
+    // Determine which agent needs refinement
+    let agentToRefine: 'Analyzer' | 'Tagger' | 'Scorer' | 'None' = 'None';
+    let critiquePrompt = '';
+
+    if (!consistencyResult.passed || !factualResult.passed) {
+      // Identify problematic agent based on issues
+      if (consistencyResult.issues.some(issue => issue.includes('Score-tag'))) {
+        agentToRefine = 'Tagger';
+        critiquePrompt = 'Review tag assignments - detected misalignment with scores. Ensure tags accurately reflect response quality.';
+      } else if (consistencyResult.issues.some(issue => issue.includes('Agent disagreement'))) {
+        agentToRefine = 'Analyzer';
+        critiquePrompt = 'Reassess analysis - significant disagreement detected among agents. Review scoring criteria and confidence levels.';
+      } else if (factualResult.issues.some(issue => issue.includes('contradiction'))) {
+        agentToRefine = 'Analyzer';
+        critiquePrompt = 'Verify factual accuracy - potential contradictions detected in candidate response. Cross-check against expected knowledge.';
+      } else if (factualResult.issues.some(issue => issue.includes('coverage'))) {
+        agentToRefine = 'Scorer';
+        critiquePrompt = 'Adjust scoring - low concept coverage detected. Consider penalizing incomplete responses more heavily.';
+      }
+    }
+
+    // Build critique reasoning
+    const allIssues = [...consistencyResult.issues, ...factualResult.issues];
+    const critiqueReasoning = this.buildCritiqueReasoning(
+      input,
+      consistencyResult.passed,
+      factualResult.passed,
+      allIssues,
+      confidenceScore
+    );
+
+    return {
+      confidence_score: confidenceScore,
+      is_consistent: consistencyResult.passed,
+      is_accurate: factualResult.passed,
+      reflexion_required: confidenceScore < VerifierAgent.THRESHOLDS.LOW_CONFIDENCE || !consistencyResult.passed || !factualResult.passed,
+      critique_reasoning: critiqueReasoning,
+      recommended_refinement: {
+        agent_to_refine: agentToRefine,
+        critique_prompt_injection: critiquePrompt,
+      },
+    };
+  }
+
+  /**
+   * Build detailed critique reasoning (Chain of Thought)
+   * 
+   * Generates structured markdown output showing all three verification stages
+   * 
+   * @param input - Original VerifierInput
+   * @param consistencyPassed - Did Stage 1 pass?
+   * @param factualPassed - Did Stage 2 pass?
+   * @param issues - All detected issues
+   * @param confidenceScore - Final confidence score
+   * @returns Formatted critique with verification analysis
+   */
+  private buildCritiqueReasoning(
+    input: VerifierInput,
+    consistencyPassed: boolean,
+    factualPassed: boolean,
+    issues: string[],
+    confidenceScore: number
+  ): string {
+    const parts: string[] = [];
+
+    parts.push('## Verification Analysis\n');
+
+    // Stage 1 results
+    parts.push('### Stage 1: Consistency Check');
+    if (consistencyPassed) {
+      parts.push('✓ Passed - Agent outputs are consistent and aligned');
+    } else {
+      parts.push('✗ Failed - Consistency issues detected:');
+      issues
+        .filter(i => i.includes('Score-tag') || i.includes('disagreement'))
+        .forEach(issue => parts.push(`  - ${issue}`));
+    }
+
+    // Stage 2 results
+    parts.push('\n### Stage 2: Factual Audit');
+    if (factualPassed) {
+      parts.push('✓ Passed - Response is factually accurate with good concept coverage');
+    } else {
+      parts.push('✗ Failed - Factual accuracy issues detected:');
+      issues
+        .filter(i => !i.includes('Score-tag') && !i.includes('disagreement'))
+        .forEach(issue => parts.push(`  - ${issue}`));
+    }
+
+    // Stage 3 decision
+    parts.push('\n### Stage 3: Reflexion Decision');
+    parts.push(`Confidence Score: ${(confidenceScore * 100).toFixed(1)}%`);
+    
+    if (confidenceScore >= VerifierAgent.THRESHOLDS.LOW_CONFIDENCE && consistencyPassed && factualPassed) {
+      parts.push('Decision: Accept - All verification stages passed');
+    } else {
+      parts.push('Decision: Reflexion Required - One or more verification stages failed');
+    }
+
+    return parts.join('\n');
+  }
+
+  /**
+   * Legacy execution path for backward compatibility
+   * Maintains existing behavior for AgentInput format
+   * 
+   * @param input - Legacy AgentInput
+   * @returns Legacy AgentOutput with verification results
+   */
+  private async executeLegacy(input: AgentInput): Promise<AgentOutput> {
     const { context, previousOutput, reflexionLoop = 0 } = input;
     const { agentOutputs } = context;
 
@@ -57,12 +644,15 @@ export class VerifierAgent extends BaseAgent {
     const scores = agentOutputs
       .filter(o => o.result.scores)
       .flatMap(o => Object.values(o.result.scores) as number[]);
-    const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
-    checks.push({
-      name: 'score_validation',
-      passed: scores.every(s => s >= 0 && s <= 10),
-      message: 'All scores within valid range',
-    });
+    
+    if (scores.length > 0) {
+      const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+      checks.push({
+        name: 'score_validation',
+        passed: scores.every(s => s >= 0 && s <= 10),
+        message: 'All scores within valid range',
+      });
+    }
 
     const allChecksPassed = checks.every(c => c.passed);
 

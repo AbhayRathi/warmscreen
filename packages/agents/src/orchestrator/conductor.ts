@@ -6,7 +6,8 @@ import {
   ScorerAgent, 
   NarratorAgent 
 } from '../agents';
-import { AgentOutput, AgentType } from '@warmscreen/shared';
+import { VerifierInput } from '../agents/verifier';
+import { AgentInput, AgentOutput, AgentType } from '@warmscreen/shared';
 import { PrismaClient } from '@warmscreen/database';
 
 /**
@@ -41,50 +42,198 @@ export class ConductorAgent {
     transcript: string;
     questionCategory: string;
     position: string;
+    questionText?: string;
+    expectedConcepts?: string[];
+    keyFacts?: string[];
   }): Promise<{
     analyzed: AgentOutput;
     tagged: AgentOutput;
     verified: AgentOutput;
   }> {
-    // Step 1: Analyzer analyzes the response
-    const analyzedOutput = await this.analyzer.execute({
-      type: 'ANALYZER',
-      context: {
-        transcript: context.transcript,
-        questionCategory: context.questionCategory,
-      },
-    });
+    try {
+      // Step 1: Analyzer analyzes the response
+      const analyzedOutput = await this.analyzer.execute({
+        type: 'ANALYZER',
+        context: {
+          transcript: context.transcript,
+          questionCategory: context.questionCategory,
+        },
+      });
 
-    // Step 2: Tagger tags the response
-    const taggedOutput = await this.tagger.execute({
-      type: 'TAGGER',
-      context: {
-        transcript: context.transcript,
-        questionCategory: context.questionCategory,
-        position: context.position,
-      },
-    });
+      // Step 2: Tagger tags the response
+      const taggedOutput = await this.tagger.execute({
+        type: 'TAGGER',
+        context: {
+          transcript: context.transcript,
+          questionCategory: context.questionCategory,
+          position: context.position,
+        },
+      });
 
-    // Step 3: Verifier verifies both outputs
-    const verifiedOutput = await this.verifier.execute({
-      type: 'VERIFIER',
-      context: {
-        agentOutputs: [analyzedOutput, taggedOutput],
-      },
-    });
+      // Step 3: Generate a basic score for this individual response
+      // (Note: Final scoring happens in finalizeInterview)
+      const responseScore = this.calculateResponseScore(analyzedOutput, taggedOutput);
 
-    // Log agent actions
-    await this.logAgentActions(context.interviewId, [
-      analyzedOutput,
-      taggedOutput,
-      verifiedOutput,
-    ]);
+      // Step 4: Verifier verifies all outputs using new three-stage verification (Issue #4 - CRITICAL)
+      const verifierInput: VerifierInput = {
+        candidateTranscript: context.transcript,
+        question: context.questionText || `Question about ${context.questionCategory}`,
+        contextKnowledge: {
+          expectedConcepts: context.expectedConcepts || this.getDefaultConcepts(context.questionCategory),
+          idealResponseCharacteristics: ['clear', 'detailed', 'accurate'],
+          keyFacts: context.keyFacts || [],
+        },
+        agentOutputs: {
+          analyzer: {
+            score: this.extractAnalyzerScore(analyzedOutput),
+            confidence: analyzedOutput.confidence,
+            insights: this.extractAnalyzerInsights(analyzedOutput),
+          },
+          tagger: {
+            tags: this.extractTaggerTags(taggedOutput),
+            confidence: taggedOutput.confidence,
+          },
+          scorer: {
+            overallScore: responseScore.score,
+            confidence: responseScore.confidence,
+            breakdown: responseScore.breakdown,
+          },
+        },
+      };
 
+      // No cast needed after BaseAgent signature update
+      const verifiedOutput = await this.verifier.execute(verifierInput);
+
+      // Note: verifiedOutput is AgentOutput wrapping VerifierOutput in result
+      // The confidence is mapped from VerifierOutput.confidence_score
+      
+      // Log agent actions
+      await this.logAgentActions(context.interviewId, [
+        analyzedOutput,
+        taggedOutput,
+        verifiedOutput,
+      ]);
+
+      return {
+        analyzed: analyzedOutput,
+        tagged: taggedOutput,
+        verified: verifiedOutput,
+      };
+    } catch (error) {
+      console.error('[ConductorAgent] processResponse failed:', error);
+      throw new Error(
+        `Failed to process response: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Extract analyzer score from output
+   */
+  private extractAnalyzerScore(output: AgentOutput): number {
+    if (output.result.scores) {
+      const scores = Object.values(output.result.scores) as number[];
+      return scores.reduce((a: number, b: number) => a + b, 0) / scores.length / 10; // Normalize to 0-1
+    }
+    return 0.5; // Default
+  }
+
+  /**
+   * Extract analyzer insights from output
+   */
+  private extractAnalyzerInsights(output: AgentOutput): string[] {
+    // Add comprehensive null check
+    if (!output?.result) {
+      return ['Analysis completed'];
+    }
+
+    if (output.result.insights) {
+      // Handle array case
+      if (Array.isArray(output.result.insights)) {
+        return output.result.insights.filter(
+          (i: any) => i && typeof i === 'string'
+        );
+      }
+      // Handle single string case
+      if (typeof output.result.insights === 'string') {
+        return [output.result.insights];
+      }
+    }
+
+    // Fallback to analysis field
+    if (output.result.analysis && typeof output.result.analysis === 'string') {
+      return [output.result.analysis];
+    }
+
+    return ['Analysis completed'];
+  }
+
+  /**
+   * Extract tagger tags from output
+   */
+  private extractTaggerTags(output: AgentOutput): string[] {
+    // Add comprehensive null check
+    if (!output?.result) {
+      return [];
+    }
+
+    // Handle direct tags array
+    if (Array.isArray(output.result.tags)) {
+      return output.result.tags.filter((t: any) => t && typeof t === 'string');
+    }
+
+    // Handle split tags
+    const tags: string[] = [];
+    if (Array.isArray(output.result.skillTags)) {
+      tags.push(
+        ...output.result.skillTags.filter((t: any) => t && typeof t === 'string')
+      );
+    }
+    if (Array.isArray(output.result.behavioralTags)) {
+      tags.push(
+        ...output.result.behavioralTags.filter((t: any) => t && typeof t === 'string')
+      );
+    }
+
+    return tags;
+  }
+
+  /**
+   * Calculate basic response score for verification
+   */
+  private calculateResponseScore(analyzedOutput: AgentOutput, taggedOutput: AgentOutput): {
+    score: number;
+    confidence: number;
+    breakdown: any;
+  } {
+    const analyzerScore = this.extractAnalyzerScore(analyzedOutput);
+    const taggerScore = taggedOutput.confidence;
+    
+    const score = (analyzerScore * 0.6 + taggerScore * 0.4);
+    const confidence = (analyzedOutput.confidence + taggedOutput.confidence) / 2;
+    
     return {
-      analyzed: analyzedOutput,
-      tagged: taggedOutput,
-      verified: verifiedOutput,
+      score,
+      confidence,
+      breakdown: {
+        analyzer: analyzerScore,
+        tagger: taggerScore,
+      },
     };
+  }
+
+  /**
+   * Get default expected concepts based on question category
+   */
+  private getDefaultConcepts(category: string): string[] {
+    const conceptMap: Record<string, string[]> = {
+      technical: ['algorithm', 'data structure', 'complexity', 'optimization'],
+      behavioral: ['teamwork', 'leadership', 'communication', 'problem-solving'],
+      system_design: ['scalability', 'architecture', 'trade-offs', 'design patterns'],
+      coding: ['syntax', 'logic', 'testing', 'debugging'],
+    };
+    
+    return conceptMap[category.toLowerCase()] || ['knowledge', 'understanding', 'clarity'];
   }
 
   /**
