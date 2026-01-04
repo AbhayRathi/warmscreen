@@ -263,7 +263,16 @@ export const interviewRoutes: FastifyPluginAsync = async (server) => {
       return reply.code(400).send({ error: 'No responses found for this interview' });
     }
 
-    const overallScore = responses.reduce((sum: number, r) => sum + (r.confidence || 0), 0) / responses.length;
+    // Calculate overall score with validation
+    const validConfidences = responses
+      .map(r => r.confidence || 0)
+      .filter(c => c >= 0 && c <= 1);
+
+    if (validConfidences.length === 0) {
+      return reply.code(400).send({ error: 'No valid confidence scores found' });
+    }
+
+    const overallScore = validConfidences.reduce((sum: number, c) => sum + c, 0) / validConfidences.length;
 
     const interview = await server.prisma.interview.update({
       where: { id },

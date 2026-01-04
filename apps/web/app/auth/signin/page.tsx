@@ -9,12 +9,17 @@ export default function SignInPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await fetch("/api/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name }),
-    });
-    router.push("/dashboard");
+    try {
+      await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, name }),
+      });
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Failed to create session:", error);
+      alert("Failed to sign in. Please try again.");
+    }
   };
 
   return (
