@@ -104,7 +104,7 @@ export default function ResultsPage() {
                         {Object.entries(r.scores).map(([key, value]) => (
                           <div key={key} className="text-sm">
                             <span className="text-gray-600 capitalize">{key}:</span>{' '}
-                            <span className="font-semibold">{value}</span>
+                            <span className="font-semibold">{String(value)}</span>
                           </div>
                         ))}
                       </div>

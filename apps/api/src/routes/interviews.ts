@@ -263,7 +263,7 @@ export const interviewRoutes: FastifyPluginAsync = async (server) => {
       return reply.code(400).send({ error: 'No responses found for this interview' });
     }
 
-    const overallScore = responses.reduce((sum, r) => sum + (r.confidence || 0), 0) / responses.length;
+    const overallScore = responses.reduce((sum: number, r) => sum + (r.confidence || 0), 0) / responses.length;
 
     const interview = await server.prisma.interview.update({
       where: { id },
