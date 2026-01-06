@@ -156,8 +156,8 @@ export default function InterviewStartPage() {
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex((prev) => prev + 1);
       } else {
-        await apiPost(`/api/interviews/${params.id}/finalize`, {});
-        router.push(`/interviews/${params.id}`);
+        await apiPost(`/api/interviews/${params.id}/complete`, {});
+        router.push(`/interviews/${params.id}/results`);
       }
     } catch (err) {
       console.error('Failed to submit response:', err);
