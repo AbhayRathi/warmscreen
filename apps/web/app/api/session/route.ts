@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
         { 
           success: false,
           error: 'Invalid input', 
-          details: error.errors.map(e => ({
+          details: error.issues.map((e: z.ZodIssue) => ({
             field: e.path.join('.'),
             message: e.message
           }))
