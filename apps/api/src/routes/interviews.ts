@@ -251,6 +251,45 @@ export const interviewRoutes: FastifyPluginAsync = async (server) => {
     return { response, agentResults };
   });
 
+  // Complete interview (simple version for MVP)
+  server.post('/:id/complete', async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    const responses = await server.prisma.response.findMany({
+      where: { interviewId: id },
+    });
+
+    if (responses.length === 0) {
+      return reply.code(400).send({ error: 'No responses found for this interview' });
+    }
+
+    // Calculate overall score with validation
+    const validConfidences = responses
+      .map(r => r.confidence || 0)
+      .filter(c => c >= 0 && c <= 1);
+
+    if (validConfidences.length === 0) {
+      return reply.code(400).send({ error: 'No valid confidence scores found' });
+    }
+
+    const overallScore = validConfidences.reduce((sum: number, c) => sum + c, 0) / validConfidences.length;
+
+    const interview = await server.prisma.interview.update({
+      where: { id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: overallScore,
+      },
+    });
+
+    // Invalidate caches
+    await cacheDel(CacheKeys.interview(id));
+    await cacheDel(CacheKeys.INTERVIEWS_LIST);
+
+    return reply.send({ interview });
+  });
+
   // Finalize interview
   server.post('/:id/finalize', async (request, reply) => {
     const { id } = request.params as { id: string };
