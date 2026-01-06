@@ -10,13 +10,15 @@
   },
   "dependencies": {
     "@warmscreen/shared": "*",
+    "date-fns": "^3.0.6",
+    "iron-session": "^8.0.4",
     "next": "16.0.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "recharts": "^2.10.3",
     "swr": "^2.2.4",
-    "zustand": "^4.4.7",
-    "date-fns": "^3.0.6",
-    "recharts": "^2.10.3"
+    "zod": "^4.3.5",
+    "zustand": "^4.4.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
