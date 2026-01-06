@@ -15,16 +15,13 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Allow public paths without authentication
-  if (publicPaths.some(path => pathname === path || pathname.startsWith(path))) {
-    // Special case: allow POST to /api/session (for login)
-    if (pathname === '/api/session' && request.method === 'POST') {
-      return NextResponse.next();
-    }
-    
-    // For other public paths, just continue
-    if (!pathname.startsWith('/api/')) {
-      return NextResponse.next();
-    }
+  if (publicPaths.some(path => pathname === path)) {
+    return NextResponse.next();
+  }
+  
+  // Special case: allow POST to /api/session (for login)
+  if (pathname === '/api/session' && request.method === 'POST') {
+    return NextResponse.next();
   }
   
   // Validate session for protected routes
