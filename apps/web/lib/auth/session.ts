@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { SessionData } from './types';
 
 const sessionOptions = {
+  // WARNING: Default password for development only. In production, SESSION_SECRET must be set.
   password: process.env.SESSION_SECRET || 'complex_password_at_least_32_characters_long_CHANGE_ME',
   cookieName: 'warmscreen_session',
   cookieOptions: {

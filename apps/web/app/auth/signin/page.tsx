@@ -29,7 +29,7 @@ function SignInForm() {
       if (!response.ok) {
         // Handle validation errors
         if (data.details && Array.isArray(data.details)) {
-          setError(data.details.map((d: any) => d.message).join(', '));
+          setError(data.details.map((d: { field: string; message: string }) => d.message).join(', '));
         } else {
           setError(data.error || 'Sign in failed. Please try again.');
         }
