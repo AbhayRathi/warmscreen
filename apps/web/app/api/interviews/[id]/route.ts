@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { getInterviewById, updateInterviewStatus } from '@/lib/db/interview';
-import { InterviewStatus } from '@prisma/client';
+import { InterviewStatus } from '@warmscreen/database';
 
 // GET - Retrieve specific interview
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -18,7 +18,8 @@ export async function GET(
       );
     }
     
-    const interview = await getInterviewById(params.id);
+    const { id } = await params;
+    const interview = await getInterviewById(id);
     
     if (!interview) {
       return NextResponse.json(
@@ -51,7 +52,7 @@ export async function GET(
 // PATCH - Update interview status
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -75,8 +76,10 @@ export async function PATCH(
       );
     }
     
+    const { id } = await params;
+    
     // Verify ownership
-    const interview = await getInterviewById(params.id);
+    const interview = await getInterviewById(id);
     if (!interview || interview.recruiterId !== session.userId) {
       return NextResponse.json(
         { error: 'Forbidden' },
@@ -84,7 +87,7 @@ export async function PATCH(
       );
     }
     
-    const updated = await updateInterviewStatus(params.id, status);
+    const updated = await updateInterviewStatus(id, status);
     
     return NextResponse.json({
       success: true,

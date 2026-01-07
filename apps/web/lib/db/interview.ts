@@ -1,5 +1,5 @@
 import prisma from './prisma';
-import { Interview, Response, InterviewStatus } from '@prisma/client';
+import { Interview, Response, InterviewStatus } from '@warmscreen/database';
 
 export interface CreateInterviewInput {
   recruiterId: string;

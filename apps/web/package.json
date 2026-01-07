@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@prisma/client": "5.22.0",
+    "@warmscreen/database": "*",
     "@warmscreen/shared": "*",
     "date-fns": "^3.0.6",
     "iron-session": "^8.0.4",

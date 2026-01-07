@@ -1,5 +1,5 @@
 import prisma from './prisma';
-import { User } from '@prisma/client';
+import { User } from '@warmscreen/database';
 
 export interface CreateUserInput {
   email: string;
