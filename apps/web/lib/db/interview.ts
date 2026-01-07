@@ -15,7 +15,7 @@ export interface InterviewWithResponses extends Interview {
 
 export async function createInterview(data: CreateInterviewInput): Promise<Interview> {
   // Generate a unique candidate ID
-  const candidateId = `cand-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const candidateId = `cand-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   
   return await prisma.interview.create({
     data: {
@@ -52,7 +52,13 @@ export async function updateInterviewStatus(
   id: string,
   status: InterviewStatus
 ): Promise<Interview> {
-  const updateData: any = { status };
+  interface UpdateData {
+    status: InterviewStatus;
+    completedAt?: Date;
+    startedAt?: Date;
+  }
+  
+  const updateData: UpdateData = { status };
   
   // If completing the interview, set completedAt
   if (status === 'COMPLETED') {
