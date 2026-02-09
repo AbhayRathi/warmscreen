@@ -1,15 +1,6 @@
 const getBaseUrl = () => {
-  const isBrowser = typeof window !== 'undefined';
-  if (isBrowser) {
-    // In browser, use relative URL (Next.js rewrites will proxy to API)
-    return '';
-  }
-  // Server-side: use direct API URL
-  return (
-    process.env.INTERNAL_API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    'http://localhost:3001'
-  );
+  // All API routes are now in Next.js, use relative URLs
+  return '';
 };
 
 const resolveUrl = (url: string) => {
