@@ -42,7 +42,6 @@ export interface QuestionSelection {
   category: string;
   difficulty: string;
   position: string;
-  expectedDuration?: number;
 }
 
 // ============================================================================

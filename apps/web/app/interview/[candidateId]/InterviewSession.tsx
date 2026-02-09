@@ -122,9 +122,11 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
       
       setInterview((prev) => prev ? { ...prev, status: 'COMPLETED', completedAt: new Date().toISOString() } : null);
       setCurrentQuestion(null);
-    } catch {
-      // If completion fails due to not enough questions, that's okay
-      // The interview is effectively complete from the user's perspective
+    } catch (error) {
+      // Log the error for debugging
+      console.error('Error completing interview:', error);
+      // If completion fails due to not enough questions, we still mark it complete from the UI
+      // This handles edge cases where the user sees completion but the API call fails
       setInterview((prev) => prev ? { ...prev, status: 'COMPLETED', completedAt: new Date().toISOString() } : null);
       setCurrentQuestion(null);
     }

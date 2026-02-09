@@ -8,9 +8,14 @@ interface ResponseInputProps {
   questionId: string;
 }
 
+function sanitizeStorageKey(key: string): string {
+  // Use encodeURIComponent to safely encode special characters
+  return encodeURIComponent(key);
+}
+
 function getInitialText(questionId: string): string {
   if (typeof window !== 'undefined') {
-    const draftKey = `interview_draft_${questionId}`;
+    const draftKey = `interview_draft_${sanitizeStorageKey(questionId)}`;
     return localStorage.getItem(draftKey) || '';
   }
   return '';
@@ -46,7 +51,7 @@ function ResponseInputInner({
   // Auto-save draft to localStorage
   useEffect(() => {
     if (questionId) {
-      const draftKey = `interview_draft_${questionId}`;
+      const draftKey = `interview_draft_${sanitizeStorageKey(questionId)}`;
       if (text) {
         localStorage.setItem(draftKey, text);
       }
@@ -59,7 +64,7 @@ function ResponseInputInner({
     const duration = elapsedSeconds;
     
     // Clear draft from localStorage
-    const draftKey = `interview_draft_${questionId}`;
+    const draftKey = `interview_draft_${sanitizeStorageKey(questionId)}`;
     localStorage.removeItem(draftKey);
     
     onSubmit(text.trim(), duration);
