@@ -5,7 +5,7 @@ import { updateQuestionCorrelationScore } from '../db/question';
  * Point-Biserial Correlation Calculation
  * 
  * Calculates the correlation between a question's scores and hiring outcomes.
- * Formula: r = ((M1 - M0) / SD) * sqrt((n1 * n0) / (n * n))
+ * Formula: r = ((M1 - M0) / SD) * sqrt((n1 * n0) / (n * (n - 1)))
  * 
  * Where:
  * - M1 = mean score of hired candidates
@@ -67,7 +67,8 @@ function calculatePointBiserialCorrelation(
     return 0; // No variance in scores
   }
   
-  const correlation = ((m1 - m0) / sd) * Math.sqrt((n1 * n0) / (n * n));
+  // Point-biserial correlation formula with correct denominator
+  const correlation = ((m1 - m0) / sd) * Math.sqrt((n1 * n0) / (n * (n - 1)));
   
   // Clamp to valid correlation range [-1, 1]
   return Math.max(-1, Math.min(1, correlation));

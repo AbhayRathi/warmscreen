@@ -248,6 +248,9 @@ export default function QuestionForm({
             Add
           </button>
         </div>
+        <p className="mt-1 text-xs text-gray-500">
+          Tags are normalized to lowercase for consistency.
+        </p>
         {formData.skillTags.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-3">
             {formData.skillTags.map((tag) => (
