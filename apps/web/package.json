@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@prisma/client": "5.22.0",
+    "@warmscreen/database": "*",
     "@warmscreen/shared": "*",
     "date-fns": "^3.0.6",
     "iron-session": "^8.0.4",
@@ -27,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
+    "prisma": "5.22.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

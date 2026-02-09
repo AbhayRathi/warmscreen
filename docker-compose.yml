@@ -2,11 +2,13 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15
+    image: postgres:16-alpine
+    container_name: warmscreen-db
+    restart: always
     environment:
       POSTGRES_USER: warmscreen
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: warmscreen
+      POSTGRES_PASSWORD: warmscreen_dev_password
+      POSTGRES_DB: warmscreen_dev
     ports:
       - "5432:5432"
     volumes:
@@ -26,4 +28,5 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
