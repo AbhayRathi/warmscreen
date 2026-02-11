@@ -4,6 +4,7 @@ import { getInterviewById } from '@/lib/db/interview';
 import { createResponse } from '@/lib/db/response';
 import { incrementQuestionUsage } from '@/lib/db/question';
 import { getNextQuestion, getInterviewProgress, isInterviewComplete } from '@/lib/services/question-selection';
+import { scoreResponse } from '@/lib/services/scoring-service';
 
 const SubmitResponseSchema = z.object({
   questionId: z.string().min(1, 'Question ID is required'),
@@ -51,6 +52,13 @@ export async function POST(
     
     // Increment question usage counter
     await incrementQuestionUsage(validatedData.questionId);
+    
+    // Trigger async scoring (background job pattern - fire and forget)
+    // Scoring happens in background and updates the database when complete
+    scoreResponse(response.id).catch(err => {
+      console.error('Background scoring failed for response:', response.id, err);
+      // Don't block response submission on scoring failure
+    });
     
     // Get progress
     const progress = await getInterviewProgress(id);
