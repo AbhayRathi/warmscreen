@@ -60,11 +60,19 @@ export const prismaMock = {
   },
   response: {
     findMany: vi.fn(),
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    count: vi.fn(),
   },
   interview: {
     findUnique: vi.fn(),
+    findFirst: vi.fn(),
     findMany: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
   },
 };
 
@@ -167,6 +175,80 @@ export function createMockSession(overrides: Partial<{
     email: 'test@example.com',
     name: 'Test User',
     isLoggedIn: true,
+    ...overrides,
+  };
+}
+
+// Mock interview type
+export interface MockInterview {
+  id: string;
+  candidateId: string;
+  candidateName: string;
+  candidateEmail: string;
+  position: string;
+  status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  scheduledAt: Date;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  score: number | null;
+  decision: 'HIRE' | 'STRONG_HIRE' | 'NO_HIRE' | 'STRONG_NO_HIRE' | null;
+  recruiterId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  responses?: MockFullResponse[];
+}
+
+// Full response type for response.ts tests
+export interface MockFullResponse {
+  id: string;
+  interviewId: string;
+  questionId: string;
+  transcript: string;
+  duration: number;
+  audioUrl: string | null;
+  scores: Record<string, number>;
+  tags: string[];
+  sentiment: number | null;
+  confidence: number | null;
+  createdAt: Date;
+  question?: MockQuestion;
+}
+
+// Helper to create a mock interview
+export function createMockInterview(overrides: Partial<MockInterview> = {}): MockInterview {
+  return {
+    id: 'test-interview-id',
+    candidateId: 'test-candidate-id',
+    candidateName: 'Test Candidate',
+    candidateEmail: 'candidate@example.com',
+    position: 'Software Engineer',
+    status: 'SCHEDULED',
+    scheduledAt: new Date('2024-01-15'),
+    startedAt: null,
+    completedAt: null,
+    score: null,
+    decision: null,
+    recruiterId: 'test-recruiter-id',
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    ...overrides,
+  };
+}
+
+// Helper to create a mock response
+export function createMockFullResponse(overrides: Partial<MockFullResponse> = {}): MockFullResponse {
+  return {
+    id: 'test-response-id',
+    interviewId: 'test-interview-id',
+    questionId: 'test-question-id',
+    transcript: 'This is a test response transcript.',
+    duration: 120,
+    audioUrl: null,
+    scores: {},
+    tags: [],
+    sentiment: null,
+    confidence: null,
+    createdAt: new Date('2024-01-01'),
     ...overrides,
   };
 }

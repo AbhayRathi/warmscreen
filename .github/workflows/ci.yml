@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ['**']
+  push:
+    branches: [develop, main]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: warmscreen
+          POSTGRES_PASSWORD: warmscreen_test_password
+          POSTGRES_DB: warmscreen_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    env:
+      DATABASE_URL: postgresql://warmscreen:warmscreen_test_password@localhost:5432/warmscreen_test
+      NODE_ENV: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.5'
+          cache: 'npm'
+
+      - name: Cache Turbo builds
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ hashFiles('**/turbo.json') }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Push Prisma schema to test database
+        run: cd packages/database && npx prisma db push --accept-data-loss
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Type check web app
+        run: cd apps/web && npx tsc --noEmit
+
+      - name: Type check API
+        run: cd apps/api && npm run type-check
+
+      - name: Run all tests
+        run: npm run test
+
+      - name: Build all apps
+        run: npm run build
+
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-coverage
+          path: apps/web/coverage
+          retention-days: 7
+          if-no-files-found: ignore
+
+  migration-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.5'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Check migration status
+        run: |
+          cd packages/database && npx prisma migrate diff \
+            --from-empty \
+            --to-schema-datamodel prisma/schema.prisma \
+            --script

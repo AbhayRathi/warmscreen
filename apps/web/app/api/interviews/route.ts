@@ -11,7 +11,7 @@ const CreateInterviewSchema = z.object({
 });
 
 // GET - List user's interviews
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const session = await getSession();
     
