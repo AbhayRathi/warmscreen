@@ -227,8 +227,9 @@ export class OrchestratorAgent {
         attempts++;
 
         if (attempts <= stage.retries) {
-          // Wait before retry with exponential backoff
-          await this.delay(Math.pow(2, attempts) * 500);
+          // Wait before retry with exponential backoff, capped at 8 seconds
+          const delay = Math.min(Math.pow(2, attempts) * 500, 8000);
+          await this.delay(delay);
         }
       }
     }

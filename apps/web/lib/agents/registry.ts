@@ -129,6 +129,17 @@ export class AgentRegistry {
   }
 
   /**
+   * Calculate rolling average
+   */
+  private calculateRollingAverage(
+    previousAvg: number,
+    newValue: number,
+    count: number
+  ): number {
+    return (previousAvg * (count - 1) + newValue) / count;
+  }
+
+  /**
    * Record execution metrics for an agent
    */
   recordExecution(
@@ -142,17 +153,17 @@ export class AgentRegistry {
       registration.executionCount++;
       registration.lastExecutionTime = new Date();
 
-      // Update rolling average latency
-      registration.avgLatencyMs =
-        (registration.avgLatencyMs * (registration.executionCount - 1) +
-          latencyMs) /
-        registration.executionCount;
-
-      // Update rolling average confidence
-      registration.avgConfidence =
-        (registration.avgConfidence * (registration.executionCount - 1) +
-          confidence) /
-        registration.executionCount;
+      // Update rolling averages
+      registration.avgLatencyMs = this.calculateRollingAverage(
+        registration.avgLatencyMs,
+        latencyMs,
+        registration.executionCount
+      );
+      registration.avgConfidence = this.calculateRollingAverage(
+        registration.avgConfidence,
+        confidence,
+        registration.executionCount
+      );
 
       if (!success) {
         registration.errorCount++;
