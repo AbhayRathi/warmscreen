@@ -3,6 +3,9 @@ import { getSession } from '@/lib/auth/session';
 import { getInterviewById } from '@/lib/db/interview';
 import { getInterviewAnalysis } from '@/lib/services/scoring-service';
 
+// Valid ID pattern (CUID format: alphanumeric with underscores, typically 25 chars)
+const VALID_ID_PATTERN = /^[a-zA-Z0-9_-]{10,50}$/;
+
 /**
  * GET /api/interviews/[id]/analysis
  * Get full interview analysis with scored responses and breakdown
@@ -13,6 +16,14 @@ export async function GET(
 ) {
   try {
     const { id: interviewId } = await params;
+    
+    // Validate ID format
+    if (!interviewId || !VALID_ID_PATTERN.test(interviewId)) {
+      return NextResponse.json(
+        { error: 'Invalid interview ID format' },
+        { status: 400 }
+      );
+    }
     
     // Verify authentication
     const session = await getSession();

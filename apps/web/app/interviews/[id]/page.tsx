@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { fetcher, apiPost } from '@/lib/api';
@@ -15,7 +15,7 @@ export default function InterviewDetailPage() {
   const [scoring, setScoring] = useState(false);
   const [scoringError, setScoringError] = useState('');
 
-  const fetchInterview = () => {
+  const fetchInterview = useCallback(() => {
     if (params.id) {
       fetcher(`/api/interviews/${params.id}`)
         .then((data) => {
@@ -27,12 +27,11 @@ export default function InterviewDetailPage() {
           setLoading(false);
         });
     }
-  };
+  }, [params.id]);
 
   useEffect(() => {
     fetchInterview();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id]);
+  }, [fetchInterview]);
 
   const handleScoreInterview = async () => {
     if (!params.id) return;

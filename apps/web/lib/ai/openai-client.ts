@@ -251,7 +251,7 @@ function getDefaultAnalysis(): ResponseAnalysis {
 
 function getDefaultExplainability(decision: string, score: number): ExplainabilityResult {
   return {
-    summary: `Candidate scored ${score.toFixed(1)}/10, resulting in a ${decision.replace('_', ' ')} decision.`,
+    summary: `Candidate scored ${score.toFixed(1)}/10, resulting in a ${decision.replace(/_/g, ' ')} decision.`,
     recommendation: 'Review individual response scores for detailed assessment.',
     developmentAreas: [],
   };

@@ -4,6 +4,9 @@ import { getResponseById } from '@/lib/db/response';
 import { getInterviewById } from '@/lib/db/interview';
 import { scoreResponse } from '@/lib/services/scoring-service';
 
+// Valid ID pattern (CUID format: alphanumeric with underscores, typically 25 chars)
+const VALID_ID_PATTERN = /^[a-zA-Z0-9_-]{10,50}$/;
+
 /**
  * POST /api/responses/[id]/score
  * Score a single interview response using AI analysis
@@ -14,6 +17,14 @@ export async function POST(
 ) {
   try {
     const { id: responseId } = await params;
+    
+    // Validate ID format
+    if (!responseId || !VALID_ID_PATTERN.test(responseId)) {
+      return NextResponse.json(
+        { error: 'Invalid response ID format' },
+        { status: 400 }
+      );
+    }
     
     // Verify authentication
     const session = await getSession();

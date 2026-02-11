@@ -13,6 +13,15 @@ import {
 } from '@/lib/ai/prompts';
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+// Maximum number of strength tags to store per response
+const MAX_STRENGTH_TAGS = 2;
+// Maximum number of weakness tags to store per response
+const MAX_WEAKNESS_TAGS = 1;
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -84,12 +93,12 @@ export async function scoreResponse(responseId: string): Promise<ScoreResponseRe
     position: interview.position,
   });
 
-  // Update response in database
+  // Update response in database with top tags from analysis
   await updateResponse(responseId, {
     scores: analysis.scores,
     sentiment: analysis.sentiment,
     confidence: analysis.confidence,
-    tags: [...analysis.strengths.slice(0, 2), ...analysis.weaknesses.slice(0, 1)],
+    tags: [...analysis.strengths.slice(0, MAX_STRENGTH_TAGS), ...analysis.weaknesses.slice(0, MAX_WEAKNESS_TAGS)],
   });
 
   return {

@@ -128,7 +128,7 @@ export const POSITION_WEIGHTS: Record<string, Record<string, number>> = {
 // ============================================================================
 
 export const DECISION_THRESHOLDS = {
-  STRONG_HIRE: 8.5,  // Top 10% candidates
+  STRONG_HIRE: 8.5,  // Exceptional performance
   HIRE: 7.0,         // Good fit
   NO_HIRE: 5.0,      // Below bar
   STRONG_NO_HIRE: 3.0, // Clear no

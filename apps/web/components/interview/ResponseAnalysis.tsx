@@ -93,8 +93,9 @@ export function ResponseAnalysis({ response, index }: ResponseAnalysisProps) {
   };
 
   // Calculate average score
-  const avgScore = hasScores
-    ? Object.values(scores).reduce((a, b) => a + b, 0) / Object.values(scores).length
+  const scoreValues = Object.values(scores);
+  const avgScore = hasScores && scoreValues.length > 0
+    ? scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length
     : null;
 
   return (

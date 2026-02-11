@@ -2,6 +2,11 @@ import { z } from 'zod';
 
 /**
  * Environment configuration for AI/OpenAI integration
+ * 
+ * SECURITY NOTE: When OPENAI_API_KEY is not set, AI features are disabled
+ * and default/fallback scores are returned. The isConfigured flag is used
+ * to track this state, and isOpenAIConfigured() must be called before
+ * attempting any AI operations.
  */
 const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY is required'),
@@ -18,13 +23,15 @@ function getAIEnv() {
   });
 
   if (!result.success) {
-    // In development or when API key is not set, return defaults for graceful degradation
+    // When API key is not set, AI features are disabled (not just degraded)
+    // The isConfigured: false flag ensures no API calls are attempted
     if (!process.env.OPENAI_API_KEY) {
+      console.warn('[AI] OPENAI_API_KEY not configured - AI scoring features will be disabled');
       return {
-        OPENAI_API_KEY: '',
+        OPENAI_API_KEY: '', // Empty key - isOpenAIConfigured() will return false
         OPENAI_MODEL: 'gpt-4o-mini',
         OPENAI_MAX_TOKENS: 500,
-        isConfigured: false,
+        isConfigured: false, // This flag prevents AI API calls
       };
     }
     throw new Error(`Invalid AI environment configuration: ${result.error.message}`);
