@@ -30,6 +30,10 @@ import {
   AgentPerformanceTracker,
 } from './feedback';
 import { getPatternRepository, PatternRepository } from './patterns';
+import { createAgentLogger, logError, logPerformance } from './logger';
+
+// Create logger for orchestrator
+const logger = createAgentLogger('ORCHESTRATOR');
 
 /**
  * Generate a unique session ID
@@ -82,13 +86,23 @@ export class OrchestratorAgent {
       context.interviewId,
       RESPONSE_ANALYSIS_PIPELINE
     );
+    const startTime = Date.now();
 
     try {
       await this.executePipeline(session, context);
       session.status = 'COMPLETED';
+      logPerformance(logger, 'processResponse', startTime, {
+        sessionId: session.id,
+        interviewId: context.interviewId,
+      });
     } catch (error) {
       session.status = 'FAILED';
-      console.error('[OrchestratorAgent] Pipeline execution failed:', error);
+      logError(logger, error, {
+        operation: 'processResponse',
+        sessionId: session.id,
+        interviewId: context.interviewId,
+        pipeline: 'RESPONSE_ANALYSIS',
+      });
     }
 
     session.endTime = new Date();
@@ -106,6 +120,7 @@ export class OrchestratorAgent {
       context.interviewId,
       FINALIZATION_PIPELINE
     );
+    const startTime = Date.now();
 
     // Add responses to context metadata
     session.metadata.responses = responses;
@@ -113,9 +128,18 @@ export class OrchestratorAgent {
     try {
       await this.executePipeline(session, context);
       session.status = 'COMPLETED';
+      logPerformance(logger, 'finalizeInterview', startTime, {
+        sessionId: session.id,
+        interviewId: context.interviewId,
+      });
     } catch (error) {
       session.status = 'FAILED';
-      console.error('[OrchestratorAgent] Finalization failed:', error);
+      logError(logger, error, {
+        operation: 'finalizeInterview',
+        sessionId: session.id,
+        interviewId: context.interviewId,
+        pipeline: 'FINALIZATION',
+      });
     }
 
     session.endTime = new Date();
@@ -381,13 +405,13 @@ export class OrchestratorAgent {
    */
   private async mockExecutor(
     agentType: AgentType,
-    context: AgentContext
+    _context: AgentContext
   ): Promise<AgentOutput> {
     // Simulate processing time
     await this.delay(100);
 
     return {
-      type: agentType,
+      type: agentType as AgentOutput['type'],
       result: {
         mock: true,
         agentType,

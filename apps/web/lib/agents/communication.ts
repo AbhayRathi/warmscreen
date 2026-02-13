@@ -14,6 +14,10 @@ import {
   AgentContext,
 } from './types';
 import { AgentOutput } from '@warmscreen/shared';
+import { createAgentLogger, logError } from './logger';
+
+// Create logger for communication
+const logger = createAgentLogger('COMMUNICATION');
 
 /**
  * Generate a unique message ID
@@ -319,10 +323,11 @@ export class AgentCommunicationManager {
         try {
           handler(message);
         } catch (error) {
-          console.error(
-            `[AgentCommunication] Error in subscriber handler for ${agentType}:`,
-            error
-          );
+          logError(logger, error, {
+            operation: 'notifySubscribers',
+            agentType,
+            messageId: message.id,
+          });
         }
       }
     }

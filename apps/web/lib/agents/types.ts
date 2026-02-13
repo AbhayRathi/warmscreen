@@ -180,6 +180,8 @@ export interface FeedbackEntry {
     actual?: unknown;
     delta?: number;
     pattern?: string;
+    confidence?: number;
+    tags?: string[];
   };
   actionTaken?: string;
   outcome?: string;

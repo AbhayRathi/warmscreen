@@ -84,3 +84,29 @@ export {
   getOrchestratorAgent,
   resetOrchestratorAgent,
 } from './orchestrator';
+
+// Logger
+export {
+  agentLogger,
+  createAgentLogger,
+  createSessionLogger,
+  logMetrics,
+  logError,
+  logPerformance,
+  isDebugEnabled,
+  isTraceEnabled,
+  type AgentLogContext,
+} from './logger';
+
+// Configuration
+export {
+  agentConfig,
+  type AgentConfig,
+  getConfigValue,
+  isDevelopment,
+  isProduction,
+  isTest,
+  getRetryConfig,
+  getRateLimitConfig,
+  getSessionConfig,
+} from './config';

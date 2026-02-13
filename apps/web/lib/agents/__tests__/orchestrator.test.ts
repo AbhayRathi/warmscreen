@@ -12,7 +12,7 @@ import { AgentRegistry } from '../registry';
 import { resetAgentCommunicationManager } from '../communication';
 import { resetFeedbackSystem } from '../feedback';
 import { resetPatternRepository } from '../patterns';
-import { AgentTypes, AgentContext } from '../types';
+import { AgentTypes, AgentContext, AgentType } from '../types';
 
 describe('OrchestratorAgent', () => {
   let orchestrator: OrchestratorAgent;

@@ -380,7 +380,7 @@ export class AgentPerformanceTracker {
   getAggregatedMetrics(): AgentPerformanceMetrics[] {
     const result: AgentPerformanceMetrics[] = [];
 
-    for (const [agentType, metrics] of this.metrics) {
+    for (const [_agentType, metrics] of this.metrics) {
       if (metrics.length === 0) continue;
 
       const latest = metrics[metrics.length - 1];

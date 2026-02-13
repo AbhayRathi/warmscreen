@@ -10,7 +10,6 @@ import {
   PatternCondition,
   PatternMatch,
 } from './types';
-import { AgentOutput } from '@warmscreen/shared';
 
 /**
  * Generate a unique pattern ID
@@ -321,12 +320,7 @@ export class PatternRepository {
   /**
    * Match patterns against agent outputs
    */
-  matchPatterns(context: {
-    transcript?: string;
-    agentOutputs?: Record<string, AgentOutput>;
-    confidence?: number;
-    reflexionLoop?: number;
-  }): PatternMatch[] {
+  matchPatterns(context: Record<string, unknown>): PatternMatch[] {
     const matches: PatternMatch[] = [];
 
     for (const pattern of this.patterns.values()) {
