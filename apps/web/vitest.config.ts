@@ -8,8 +8,16 @@ export default defineConfig({
     include: ['**/__tests__/**/*.test.ts', '**/*.test.ts'],
     exclude: ['node_modules', '.next', 'dist'],
     coverage: {
-      reporter: ['text', 'json', 'html'],
-      exclude: ['node_modules/**', '.next/**', 'dist/**'],
+      provider: 'v8',
+      reporter: ['text', 'json', 'json-summary', 'html'],
+      exclude: ['node_modules/**', '.next/**', 'dist/**', '**/__tests__/**'],
+      include: ['lib/agents/**/*.ts'],
+      thresholds: {
+        lines: 90,
+        functions: 90,
+        branches: 75,
+        statements: 90,
+      },
     },
     testTimeout: 30000,
     hookTimeout: 30000,
