@@ -110,3 +110,50 @@ export {
   getRateLimitConfig,
   getSessionConfig,
 } from './config';
+
+// Base Agent Class
+export {
+  BaseOrchestrationAgent,
+  createAgentExecutor,
+  type AgentFactory,
+  type AgentExecutor,
+} from './base-agent';
+
+// Orchestrated Agent Implementations
+export {
+  AnalyzerOrchestrationAgent,
+  getAnalyzerAgent,
+  resetAnalyzerAgent,
+  type AnalysisResult,
+} from './analyzer-agent';
+
+export {
+  TaggerOrchestrationAgent,
+  getTaggerAgent,
+  resetTaggerAgent,
+  type TaggingResult,
+} from './tagger-agent';
+
+export {
+  VerifierOrchestrationAgent,
+  getVerifierAgent,
+  resetVerifierAgent,
+  type VerificationResult,
+  type VerificationCheck,
+} from './verifier-agent';
+
+export {
+  ScorerOrchestrationAgent,
+  getScorerAgent,
+  resetScorerAgent,
+  type ScoringResult,
+  type ScoringModel,
+  type HiringDecision,
+} from './scorer-agent';
+
+export {
+  NarratorOrchestrationAgent,
+  getNarratorAgent,
+  resetNarratorAgent,
+  type NarrationResult,
+} from './narrator-agent';
