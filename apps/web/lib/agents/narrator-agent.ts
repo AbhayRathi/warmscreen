@@ -242,7 +242,7 @@ export class NarratorOrchestrationAgent extends BaseOrchestrationAgent {
     }
 
     // Insights
-    if (analyzerOutput?.result?.insights?.length > 0) {
+    if (analyzerOutput && analyzerOutput.result?.insights?.length > 0) {
       parts.push('\n### Key Insights\n');
       parts.push(analyzerOutput.result.insights.map((i: string) => `- ${i}`).join('\n') + '\n');
     }

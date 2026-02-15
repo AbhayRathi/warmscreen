@@ -234,29 +234,29 @@ describe('Orchestrated Agent Implementations', () => {
 
     it('should verify consistency with previous agent outputs', async () => {
       const analyzerOutput = {
-        type: AgentTypes.ANALYZER as const,
+        type: AgentTypes.ANALYZER,
         result: {
           scores: { technical: 8, communication: 7, depth: 7 },
         },
         confidence: 0.85,
         reflexionLoop: 0,
-      };
+      } as const;
 
       const taggerOutput = {
-        type: AgentTypes.TAGGER as const,
+        type: AgentTypes.TAGGER,
         result: {
           skillTags: ['technical', 'problemSolving'],
           behavioralTags: ['thoughtful'],
         },
         confidence: 0.8,
         reflexionLoop: 0,
-      };
+      } as const;
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
         previousAnalysis: new Map([
-          [AgentTypes.ANALYZER, analyzerOutput],
-          [AgentTypes.TAGGER, taggerOutput],
+          [AgentTypes.ANALYZER, analyzerOutput] as const,
+          [AgentTypes.TAGGER, taggerOutput] as const,
         ]),
       };
 
@@ -321,16 +321,16 @@ describe('Orchestrated Agent Implementations', () => {
 
     it('should calculate scores from previous agent outputs', async () => {
       const analyzerOutput = {
-        type: AgentTypes.ANALYZER as const,
+        type: AgentTypes.ANALYZER,
         result: {
           scores: { technical: 8, communication: 7, depth: 7, problemSolving: 7 },
         },
         confidence: 0.85,
         reflexionLoop: 0,
-      };
+      } as const;
 
       const taggerOutput = {
-        type: AgentTypes.TAGGER as const,
+        type: AgentTypes.TAGGER,
         result: {
           skillTags: ['technical', 'problemSolving', 'communication'],
           behavioralTags: ['collaborative', 'growth-mindset'],
@@ -338,13 +338,13 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.8,
         reflexionLoop: 0,
-      };
+      } as const;
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
         previousAnalysis: new Map([
-          [AgentTypes.ANALYZER, analyzerOutput],
-          [AgentTypes.TAGGER, taggerOutput],
+          [AgentTypes.ANALYZER, analyzerOutput] as const,
+          [AgentTypes.TAGGER, taggerOutput] as const,
         ]),
       };
 
@@ -358,13 +358,13 @@ describe('Orchestrated Agent Implementations', () => {
 
     it('should generate hiring decision', async () => {
       const analyzerOutput = {
-        type: AgentTypes.ANALYZER as const,
+        type: AgentTypes.ANALYZER,
         result: {
           scores: { technical: 9, communication: 8, depth: 8 },
         },
         confidence: 0.9,
         reflexionLoop: 0,
-      };
+      } as const;
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
@@ -413,7 +413,7 @@ describe('Orchestrated Agent Implementations', () => {
 
     it('should generate narrative summary', async () => {
       const scorerOutput = {
-        type: AgentTypes.SCORER as const,
+        type: AgentTypes.SCORER,
         result: {
           overallScore: 75,
           decision: 'HIRE',
@@ -424,7 +424,7 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.85,
         reflexionLoop: 0,
-      };
+      } as const;
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
@@ -441,13 +441,13 @@ describe('Orchestrated Agent Implementations', () => {
 
     it('should include strengths and weaknesses', async () => {
       const analyzerOutput = {
-        type: AgentTypes.ANALYZER as const,
+        type: AgentTypes.ANALYZER,
         result: {
           scores: { technical: 9, communication: 4, depth: 7 },
         },
         confidence: 0.85,
         reflexionLoop: 0,
-      };
+      } as const;
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
@@ -464,7 +464,7 @@ describe('Orchestrated Agent Implementations', () => {
 
     it('should provide recommendations', async () => {
       const scorerOutput = {
-        type: AgentTypes.SCORER as const,
+        type: AgentTypes.SCORER,
         result: {
           overallScore: 75,
           decision: 'HIRE',
@@ -473,7 +473,7 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.85,
         reflexionLoop: 0,
-      };
+      } as const;
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
@@ -489,24 +489,24 @@ describe('Orchestrated Agent Implementations', () => {
 
     it('should generate agent contributions', async () => {
       const analyzerOutput = {
-        type: AgentTypes.ANALYZER as const,
+        type: AgentTypes.ANALYZER,
         result: { scores: {} },
         confidence: 0.85,
         reflexionLoop: 0,
-      };
+      } as const;
 
       const taggerOutput = {
-        type: AgentTypes.TAGGER as const,
+        type: AgentTypes.TAGGER,
         result: { skillTags: ['tech'], behavioralTags: [] },
         confidence: 0.8,
         reflexionLoop: 0,
-      };
+      } as const;
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
         previousAnalysis: new Map([
-          [AgentTypes.ANALYZER, analyzerOutput],
-          [AgentTypes.TAGGER, taggerOutput],
+          [AgentTypes.ANALYZER, analyzerOutput] as const,
+          [AgentTypes.TAGGER, taggerOutput] as const,
         ]),
       };
 
@@ -518,7 +518,7 @@ describe('Orchestrated Agent Implementations', () => {
 
     it('should generate detailed explanation', async () => {
       const scorerOutput = {
-        type: AgentTypes.SCORER as const,
+        type: AgentTypes.SCORER,
         result: {
           overallScore: 85,
           decision: 'STRONG_HIRE',
@@ -527,7 +527,7 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.9,
         reflexionLoop: 0,
-      };
+      } as const;
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,

@@ -6,6 +6,7 @@
  */
 
 import { AgentOutput } from '@warmscreen/shared';
+import type { Logger } from 'pino';
 import {
   AgentType,
   AgentContext,
@@ -59,7 +60,7 @@ export abstract class BaseOrchestrationAgent {
   /**
    * Logger instance for this agent
    */
-  protected logger;
+  protected logger: Logger | null;
 
   constructor() {
     // Initialize logger lazily to allow subclass to set id first
