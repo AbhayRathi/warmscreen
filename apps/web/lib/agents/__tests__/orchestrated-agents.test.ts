@@ -28,7 +28,8 @@ import {
   getNarratorAgent,
   resetNarratorAgent,
 } from '../narrator-agent';
-import { AgentContext, AgentTypes } from '../types';
+import { AgentContext, AgentTypes, AgentType } from '../types';
+import { AgentOutput } from '@warmscreen/shared';
 import { AgentRegistry } from '../registry';
 
 describe('Orchestrated Agent Implementations', () => {
@@ -254,7 +255,7 @@ describe('Orchestrated Agent Implementations', () => {
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
-        previousAnalysis: new Map([
+        previousAnalysis: new Map<AgentType, AgentOutput>([
           [AgentTypes.ANALYZER, analyzerOutput],
           [AgentTypes.TAGGER, taggerOutput],
         ]),
@@ -342,7 +343,7 @@ describe('Orchestrated Agent Implementations', () => {
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
-        previousAnalysis: new Map([
+        previousAnalysis: new Map<AgentType, AgentOutput>([
           [AgentTypes.ANALYZER, analyzerOutput],
           [AgentTypes.TAGGER, taggerOutput],
         ]),
@@ -504,7 +505,7 @@ describe('Orchestrated Agent Implementations', () => {
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
-        previousAnalysis: new Map([
+        previousAnalysis: new Map<AgentType, AgentOutput>([
           [AgentTypes.ANALYZER, analyzerOutput],
           [AgentTypes.TAGGER, taggerOutput],
         ]),
