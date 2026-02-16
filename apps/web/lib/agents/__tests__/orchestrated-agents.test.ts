@@ -255,8 +255,8 @@ describe('Orchestrated Agent Implementations', () => {
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
         previousAnalysis: new Map([
-          [AgentTypes.ANALYZER, analyzerOutput] as const,
-          [AgentTypes.TAGGER, taggerOutput] as const,
+          [AgentTypes.ANALYZER, analyzerOutput],
+          [AgentTypes.TAGGER, taggerOutput],
         ]),
       };
 
@@ -343,8 +343,8 @@ describe('Orchestrated Agent Implementations', () => {
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
         previousAnalysis: new Map([
-          [AgentTypes.ANALYZER, analyzerOutput] as const,
-          [AgentTypes.TAGGER, taggerOutput] as const,
+          [AgentTypes.ANALYZER, analyzerOutput],
+          [AgentTypes.TAGGER, taggerOutput],
         ]),
       };
 
@@ -505,8 +505,8 @@ describe('Orchestrated Agent Implementations', () => {
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
         previousAnalysis: new Map([
-          [AgentTypes.ANALYZER, analyzerOutput] as const,
-          [AgentTypes.TAGGER, taggerOutput] as const,
+          [AgentTypes.ANALYZER, analyzerOutput],
+          [AgentTypes.TAGGER, taggerOutput],
         ]),
       };
 
