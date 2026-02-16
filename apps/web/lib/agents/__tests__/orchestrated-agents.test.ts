@@ -240,7 +240,7 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.85,
         reflexionLoop: 0,
-      } as const;
+      };
 
       const taggerOutput = {
         type: AgentTypes.TAGGER,
@@ -250,7 +250,7 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.8,
         reflexionLoop: 0,
-      } as const;
+      };
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
@@ -327,7 +327,7 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.85,
         reflexionLoop: 0,
-      } as const;
+      };
 
       const taggerOutput = {
         type: AgentTypes.TAGGER,
@@ -338,7 +338,7 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.8,
         reflexionLoop: 0,
-      } as const;
+      };
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
@@ -364,7 +364,7 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.9,
         reflexionLoop: 0,
-      } as const;
+      };
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
@@ -424,7 +424,7 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.85,
         reflexionLoop: 0,
-      } as const;
+      };
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
@@ -447,7 +447,7 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.85,
         reflexionLoop: 0,
-      } as const;
+      };
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
@@ -473,7 +473,7 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.85,
         reflexionLoop: 0,
-      } as const;
+      };
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
@@ -493,14 +493,14 @@ describe('Orchestrated Agent Implementations', () => {
         result: { scores: {} },
         confidence: 0.85,
         reflexionLoop: 0,
-      } as const;
+      };
 
       const taggerOutput = {
         type: AgentTypes.TAGGER,
         result: { skillTags: ['tech'], behavioralTags: [] },
         confidence: 0.8,
         reflexionLoop: 0,
-      } as const;
+      };
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
@@ -527,7 +527,7 @@ describe('Orchestrated Agent Implementations', () => {
         },
         confidence: 0.9,
         reflexionLoop: 0,
-      } as const;
+      };
 
       const contextWithAnalysis: AgentContext = {
         ...mockContext,
