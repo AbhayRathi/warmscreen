@@ -33,22 +33,107 @@ Interview Response
 
 ## Agents
 
-### ANALYZER
-Extracts technical concepts, key facts, and insights from interview responses. Performs deep analysis of candidate knowledge and expertise.
+The orchestration system includes 5 specialized agents that work together to analyze interview responses:
 
-### TAGGER
-Categorizes responses by skill, topic, and domain. Applies relevant tags for easy filtering and comparison.
+### ANALYZER (`AnalyzerOrchestrationAgent`)
+Deep technical analysis of interview responses including:
+- Technical competency scoring
+- Communication quality assessment
+- Response depth evaluation
+- Structure analysis (introduction, conclusion, logical flow)
+- Technical concept extraction
 
-### VERIFIER
-Validates accuracy and consistency of analysis results. Cross-checks information between agents and flags discrepancies.
+**Output**: `AnalysisResult` with scores, insights, and technical concepts
 
-### SCORER
-Assigns numerical scores with confidence levels. Uses multi-dimensional scoring based on position-specific criteria.
+### TAGGER (`TaggerOrchestrationAgent`)
+Skill extraction and categorization including:
+- Technical skill tags (programming, leadership, etc.)
+- Behavioral pattern tags (growth-mindset, collaborative, etc.)
+- Position-specific competency mapping
+- Sentiment analysis
+- Keyword extraction
 
-### NARRATOR
-Generates human-readable summaries and explanations. Creates clear, actionable feedback for hiring managers.
+**Output**: `TaggingResult` with skill tags, behavioral tags, and sentiment
+
+### VERIFIER (`VerifierOrchestrationAgent`)
+Three-stage verification system:
+1. **Consistency Check** - Score-tag alignment, agent agreement
+2. **Factual Audit** - Technical accuracy, concept coverage
+3. **Reflexion Decision** - Recommendations and confidence scoring
+
+**Output**: `VerificationResult` with checks, issues, and recommendations
+
+### SCORER (`ScorerOrchestrationAgent`)
+Multi-dimensional scoring with position-specific models:
+- Weighted scoring across dimensions (technical, communication, etc.)
+- Position-specific scoring models (Software Engineer, Product Manager, etc.)
+- Hiring decision generation (STRONG_HIRE, HIRE, NO_HIRE, STRONG_NO_HIRE)
+- Decision confidence calculation
+
+**Output**: `ScoringResult` with overall score, component scores, and decision
+
+### NARRATOR (`NarratorOrchestrationAgent`)
+Human-readable explanation generation:
+- Executive summary creation
+- Strengths and weaknesses analysis
+- Key factor identification
+- Recommendation generation
+- Detailed markdown explanation
+
+**Output**: `NarrationResult` with summary, explanation, and recommendations
 
 ## Quick Start
+
+### Using Orchestrated Agents Directly
+
+```typescript
+import {
+  getAnalyzerAgent,
+  getTaggerAgent,
+  getVerifierAgent,
+  getScorerAgent,
+  getNarratorAgent,
+  AgentContext,
+  AgentTypes,
+} from '@/lib/agents';
+
+// Create context for analysis
+const context: AgentContext = {
+  interviewId: 'int-123',
+  responseId: 'resp-456',
+  question: {
+    id: 'q-1',
+    content: 'Explain React state management',
+    category: 'technical',
+    difficulty: 'MEDIUM',
+    position: 'Frontend Engineer',
+    expectedConcepts: ['useState', 'useReducer', 'context'],
+    keyFacts: ['React state is immutable'],
+  },
+  response: {
+    transcript: 'React manages state using hooks like useState...',
+    duration: 120,
+  },
+  position: 'Frontend Engineer',
+  candidateName: 'John Doe',
+};
+
+// Execute agents individually
+const analyzerOutput = await getAnalyzerAgent().execute(context);
+const taggerOutput = await getTaggerAgent().execute(context);
+
+// Pass previous analysis to dependent agents
+const verifierContext = {
+  ...context,
+  previousAnalysis: new Map([
+    [AgentTypes.ANALYZER, analyzerOutput],
+    [AgentTypes.TAGGER, taggerOutput],
+  ]),
+};
+const verifierOutput = await getVerifierAgent().execute(verifierContext);
+```
+
+### Using the Orchestrator
 
 ```typescript
 import { getOrchestratorAgent, AgentTypes } from '@/lib/agents';
@@ -228,7 +313,7 @@ console.log(`Cleaned ${cleaned} sessions`);
 
 ### Test Coverage
 
-- **Unit tests**: 160+ tests covering all modules
+- **Unit tests**: 344+ tests covering all modules
 - **Load tests**: Concurrent execution and throughput testing
 - **Coverage**: 90%+ statements, 90%+ functions, 75%+ branches
 
@@ -236,10 +321,13 @@ console.log(`Cleaned ${cleaned} sessions`);
 
 ```bash
 # Run all agent tests
-npm run test -- --run lib/agents
+npm run test -- --filter=web
+
+# Run orchestrated agent tests
+npm run test -- lib/agents/__tests__/orchestrated-agents.test.ts
 
 # Run with coverage
-npm run test -- --run lib/agents --coverage
+npm run test -- --filter=web --coverage
 
 # Run performance tests
 npm run test -- --run lib/agents/__tests__/performance.test.ts
@@ -381,6 +469,105 @@ logError(logger, error, {
 | `getFeedbackForAgent(agentType)` | Get feedback for agent |
 | `getFeedbackForInterview(interviewId)` | Get feedback for interview |
 | `getAccuracyTrend(agentType)` | Get accuracy trend |
+
+### BaseOrchestrationAgent (Abstract)
+
+All orchestrated agents extend this base class:
+
+| Property | Description |
+|----------|-------------|
+| `id` | Agent type identifier (e.g., `ANALYZER`) |
+| `name` | Human-readable agent name |
+| `description` | What the agent does |
+| `capabilities` | List of capabilities provided |
+
+| Method | Description |
+|--------|-------------|
+| `execute(context)` | Execute agent with full orchestration support |
+| `analyze(context)` | Abstract method - core analysis logic |
+| `getCapability()` | Get agent capability definition |
+| `register()` | Register with global registry |
+
+### AnalyzerOrchestrationAgent
+
+| Method | Description |
+|--------|-------------|
+| `getAnalyzerAgent()` | Get singleton instance |
+| `resetAnalyzerAgent()` | Reset singleton (for testing) |
+
+**Output Type**: `AnalysisResult`
+- `scores`: { technical, communication, depth, problemSolving?, clarity? }
+- `confidence`: 0-1 confidence score
+- `insights`: Array of insight strings
+- `technicalConcepts`: Extracted technical concepts
+- `structureAnalysis`: { hasIntroduction, hasConclusion, logicalFlow }
+
+### TaggerOrchestrationAgent
+
+| Method | Description |
+|--------|-------------|
+| `getTaggerAgent()` | Get singleton instance |
+| `resetTaggerAgent()` | Reset singleton (for testing) |
+
+**Output Type**: `TaggingResult`
+- `skillTags`: Technical/soft skill tags
+- `behavioralTags`: Behavioral pattern tags
+- `competencyTags`: Position-specific competencies
+- `keywords`: Extracted keywords
+- `sentiment`: -1 to 1 sentiment score
+- `confidence`: 0-1 confidence score
+
+### VerifierOrchestrationAgent
+
+| Method | Description |
+|--------|-------------|
+| `getVerifierAgent()` | Get singleton instance |
+| `resetVerifierAgent()` | Reset singleton (for testing) |
+
+**Output Type**: `VerificationResult`
+- `isConsistent`: Boolean - passed consistency check
+- `isAccurate`: Boolean - passed factual audit
+- `confidence`: 0-1 confidence score
+- `checks`: Array of verification checks
+- `issues`: Detected issues
+- `recommendations`: Action recommendations
+- `reflexionRequired`: Should trigger re-run
+- `agentToRefine`: Which agent needs refinement
+- `critiquePrompt`: Instruction for re-run
+
+### ScorerOrchestrationAgent
+
+| Method | Description |
+|--------|-------------|
+| `getScorerAgent()` | Get singleton instance |
+| `resetScorerAgent()` | Reset singleton (for testing) |
+
+**Output Type**: `ScoringResult`
+- `overallScore`: 0-100 overall score
+- `componentScores`: Scores per dimension
+- `decision`: STRONG_HIRE | HIRE | NO_HIRE | STRONG_NO_HIRE
+- `decisionConfidence`: 0-1 confidence in decision
+- `weights`: Applied weights per dimension
+- `thresholds`: Decision thresholds
+- `breakdown`: Detailed score breakdown
+
+### NarratorOrchestrationAgent
+
+| Method | Description |
+|--------|-------------|
+| `getNarratorAgent()` | Get singleton instance |
+| `resetNarratorAgent()` | Reset singleton (for testing) |
+
+**Output Type**: `NarrationResult`
+- `summary`: Executive summary string
+- `detailedExplanation`: Markdown formatted explanation
+- `strengths`: Array of strength descriptions
+- `weaknesses`: Array of weakness descriptions
+- `keyFactors`: Key decision factors with impact scores
+- `recommendations`: Action recommendations
+- `scoringBreakdown`: Score per dimension
+- `agentContributions`: What each agent contributed
+- `confidence`: 0-1 confidence score
 
 ## License
 
