@@ -16,12 +16,14 @@ interface Props {
  * Can be used standalone or within AgentAnalysisPanel.
  */
 export default function AgentFindings({ agentType, findings, showHeader = true }: Props) {
-  const agentConfig: Record<AgentType, { icon: string; color: string; title: string }> = {
-    ANALYZER: { icon: '🔍', color: 'blue', title: 'Analysis Results' },
-    VERIFIER: { icon: '✓', color: 'green', title: 'Verification Results' },
-    TAGGER: { icon: '🏷️', color: 'purple', title: 'Tagging Results' },
-    SCORER: { icon: '📊', color: 'orange', title: 'Scoring Results' },
-    NARRATOR: { icon: '📝', color: 'gray', title: 'Narrative Summary' },
+  // Map agent types to their display configuration with full Tailwind class names
+  // (Tailwind requires full class names to be present at build time)
+  const agentConfig: Record<AgentType, { icon: string; colorClass: string; title: string }> = {
+    ANALYZER: { icon: '🔍', colorClass: 'text-blue-700', title: 'Analysis Results' },
+    VERIFIER: { icon: '✓', colorClass: 'text-green-700', title: 'Verification Results' },
+    TAGGER: { icon: '🏷️', colorClass: 'text-purple-700', title: 'Tagging Results' },
+    SCORER: { icon: '📊', colorClass: 'text-orange-700', title: 'Scoring Results' },
+    NARRATOR: { icon: '📝', colorClass: 'text-gray-700', title: 'Narrative Summary' },
   };
   
   const config = agentConfig[agentType];
@@ -29,7 +31,7 @@ export default function AgentFindings({ agentType, findings, showHeader = true }
   return (
     <div className="space-y-4">
       {showHeader && (
-        <h3 className={`text-lg font-semibold text-${config.color}-700 flex items-center gap-2`}>
+        <h3 className={`text-lg font-semibold ${config.colorClass} flex items-center gap-2`}>
           <span>{config.icon}</span>
           {config.title}
         </h3>

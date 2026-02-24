@@ -175,6 +175,9 @@ model AgentLog {
   id              String      @id @default(cuid())
   interviewId     String?
   interview       Interview?  @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  // Note: responseId is stored as a String without a formal relation to Response model.
+  // This is intentional to allow agent logs to exist independently and support 
+  // scenarios where responses might be deleted while preserving analysis history.
   responseId      String?     // Link to specific response being analyzed
   
   agentType       AgentType

@@ -203,10 +203,11 @@ export async function executeFullAnalysis(
     // 3. Ensure agents are registered
     registerAllAgents();
     
-    // 4. Create pipeline for the position
-    const _pipeline = createAnalysisPipeline(interview.position);
+    // Note: createAnalysisPipeline is available for custom pipeline configuration,
+    // but the orchestrator uses its default RESPONSE_ANALYSIS_PIPELINE.
+    // Future enhancement: pass custom pipeline to orchestrator.processResponse()
     
-    // 5. Build agent context
+    // 4. Build agent context
     const context: AgentContext = {
       interviewId,
       responseId,
