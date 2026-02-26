@@ -98,11 +98,11 @@ const mockOrchestrator = {
   processResponse: vi.fn().mockResolvedValue({
     status: 'COMPLETED',
     results: new Map([
-      ['ANALYZER', { output: mockAnalyzerAgent.execute().then(r => r), latencyMs: 100, reflexionLoops: 0, success: true }],
-      ['TAGGER', { output: mockTaggerAgent.execute().then(r => r), latencyMs: 80, reflexionLoops: 0, success: true }],
-      ['VERIFIER', { output: mockVerifierAgent.execute().then(r => r), latencyMs: 90, reflexionLoops: 0, success: true }],
-      ['SCORER', { output: mockScorerAgent.execute().then(r => r), latencyMs: 75, reflexionLoops: 0, success: true }],
-      ['NARRATOR', { output: mockNarratorAgent.execute().then(r => r), latencyMs: 85, reflexionLoops: 0, success: true }],
+      ['ANALYZER', { output: mockAnalyzerAgent.execute().then((r: unknown) => r), latencyMs: 100, reflexionLoops: 0, success: true }],
+      ['TAGGER', { output: mockTaggerAgent.execute().then((r: unknown) => r), latencyMs: 80, reflexionLoops: 0, success: true }],
+      ['VERIFIER', { output: mockVerifierAgent.execute().then((r: unknown) => r), latencyMs: 90, reflexionLoops: 0, success: true }],
+      ['SCORER', { output: mockScorerAgent.execute().then((r: unknown) => r), latencyMs: 75, reflexionLoops: 0, success: true }],
+      ['NARRATOR', { output: mockNarratorAgent.execute().then((r: unknown) => r), latencyMs: 85, reflexionLoops: 0, success: true }],
     ]),
     interviewId: 'interview-123',
     startTime: Date.now(),

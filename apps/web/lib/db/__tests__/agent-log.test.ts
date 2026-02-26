@@ -196,6 +196,7 @@ describe('Agent Log Database Utilities', () => {
         action: 'analyze',
         input: {},
         output: {},
+        reflexionLoop: 0,
       };
 
       const result = await createAgentLog(input);
@@ -226,6 +227,7 @@ describe('Agent Log Database Utilities', () => {
         processingTime: 1500,
         tokensUsed: 250,
         performanceScore: 0.9,
+        reflexionLoop: 0,
       };
 
       const result = await createAgentLog(input);
@@ -242,6 +244,7 @@ describe('Agent Log Database Utilities', () => {
         agentType: 'ANALYZER' as const,
       };
 
+      // @ts-expect-error - Testing runtime validation with incomplete data
       await expect(createAgentLog(input)).rejects.toThrow();
     });
 
@@ -252,6 +255,7 @@ describe('Agent Log Database Utilities', () => {
         agentType: 'INVALID' as any,
       };
 
+      // @ts-expect-error - Testing runtime validation with invalid agent type
       await expect(createAgentLog(input)).rejects.toThrow();
     });
   });
@@ -635,6 +639,10 @@ describe('Agent Log Database Utilities', () => {
           interviewId: 'interview-123',
           responseId: 'response-123',
           agentType: 'ANALYZER' as const,
+          action: 'analyze',
+          input: {},
+          output: {},
+          reflexionLoop: 0,
         })
       );
 
@@ -657,6 +665,10 @@ describe('Agent Log Database Utilities', () => {
         interviewId: 'interview-123',
         responseId: 'response-123',
         agentType: 'ANALYZER' as const,
+        action: 'analyze',
+        input: {},
+        output: {},
+        reflexionLoop: 0,
         findings: mockLog.findings as Record<string, unknown>,
       });
 
@@ -675,6 +687,10 @@ describe('Agent Log Database Utilities', () => {
         interviewId: 'interview-123',
         responseId: 'response-123',
         agentType: 'ANALYZER' as const,
+        action: 'analyze',
+        input: {},
+        output: {},
+        reflexionLoop: 0,
         findings: largeFindings,
       });
 
