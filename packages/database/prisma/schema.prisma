@@ -134,6 +134,8 @@ model Response {
   tags            String[]
   sentiment       Float?    // -1 to 1
   confidence      Float?    // 0 to 1
+  agentAnalysis   Json?     // Store structured agent findings
+  analyzedAt      DateTime? // When agent analysis completed
   
   createdAt       DateTime  @default(now())
   
@@ -173,18 +175,27 @@ model AgentLog {
   id              String      @id @default(cuid())
   interviewId     String?
   interview       Interview?  @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  // Note: responseId is stored as a String without a formal relation to Response model.
+  // This is intentional to allow agent logs to exist independently and support 
+  // scenarios where responses might be deleted while preserving analysis history.
+  responseId      String?     // Link to specific response being analyzed
   
   agentType       AgentType
   action          String
   input           Json
   output          Json
+  findings        Json?       // Structured findings from agent
   reflexionLoop   Int         @default(0)
   performanceScore Float?
+  confidence      Float?      // Agent confidence score (0-1)
+  processingTime  Int?        // Processing time in milliseconds
+  tokensUsed      Int?        // Number of tokens used
   
   createdAt       DateTime    @default(now())
   
   @@index([agentType])
   @@index([interviewId])
+  @@index([responseId])
 }
 
 enum AgentType {

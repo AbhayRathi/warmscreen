@@ -74,6 +74,16 @@ export const prismaMock = {
     create: vi.fn(),
     update: vi.fn(),
   },
+  agentLog: {
+    create: vi.fn(),
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    deleteMany: vi.fn(),
+    count: vi.fn(),
+  },
 };
 
 // Helper to create a mock question
@@ -248,6 +258,46 @@ export function createMockFullResponse(overrides: Partial<MockFullResponse> = {}
     tags: [],
     sentiment: null,
     confidence: null,
+    createdAt: new Date('2024-01-01'),
+    ...overrides,
+  };
+}
+
+// Mock agent log type
+export interface MockAgentLog {
+  id: string;
+  interviewId: string | null;
+  responseId: string | null;
+  agentType: 'ANALYZER' | 'VERIFIER' | 'PLANNER' | 'CONDUCTOR' | 'TAGGER' | 'SCORER' | 'NARRATOR';
+  action: string;
+  input: Record<string, unknown>;
+  output: Record<string, unknown>;
+  findings: Record<string, unknown> | null;
+  reflexionLoop: number;
+  performanceScore: number | null;
+  confidence: number | null;
+  processingTime: number | null;
+  tokensUsed: number | null;
+  createdAt: Date;
+  interview?: MockInterview;
+}
+
+// Helper to create a mock agent log
+export function createMockAgentLog(overrides: Partial<MockAgentLog> = {}): MockAgentLog {
+  return {
+    id: 'test-agent-log-id',
+    interviewId: 'test-interview-id',
+    responseId: 'test-response-id',
+    agentType: 'ANALYZER',
+    action: 'analyze',
+    input: {},
+    output: {},
+    findings: null,
+    reflexionLoop: 0,
+    performanceScore: null,
+    confidence: 0.85,
+    processingTime: 1500,
+    tokensUsed: 250,
     createdAt: new Date('2024-01-01'),
     ...overrides,
   };

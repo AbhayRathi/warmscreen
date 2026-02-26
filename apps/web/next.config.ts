@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '2mb',
     },
   },
+  
+  // Exclude pino from server-side bundling (it's a Node.js module)
+  serverExternalPackages: ['pino', 'pino-pretty', 'thread-stream'],
+  
+  // Empty turbopack config to allow the build to proceed
+  turbopack: {},
 };
 
 export default nextConfig;

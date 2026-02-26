@@ -157,3 +157,15 @@ export {
   resetNarratorAgent,
   type NarrationResult,
 } from './narrator-agent';
+
+// Agent Factory
+export {
+  registerAllAgents,
+  createAnalysisPipeline,
+  executeFullAnalysis,
+  executeInterviewAnalysis,
+  areAgentsRegistered,
+  getAgentHealthStatus,
+  resetAllAgents,
+  type FullAnalysisResult,
+} from './agent-factory';

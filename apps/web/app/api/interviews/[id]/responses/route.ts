@@ -5,6 +5,7 @@ import { createResponse } from '@/lib/db/response';
 import { incrementQuestionUsage } from '@/lib/db/question';
 import { getNextQuestion, getInterviewProgress, isInterviewComplete } from '@/lib/services/question-selection';
 import { scoreResponse } from '@/lib/services/scoring-service';
+import { executeFullAnalysis } from '@/lib/agents/agent-factory';
 
 const SubmitResponseSchema = z.object({
   questionId: z.string().min(1, 'Question ID is required'),
@@ -58,6 +59,13 @@ export async function POST(
     scoreResponse(response.id).catch(err => {
       console.error('Background scoring failed for response:', response.id, err);
       // Don't block response submission on scoring failure
+    });
+    
+    // Trigger async agent analysis (fire-and-forget pattern)
+    // Agent analysis happens in background and updates the database when complete
+    executeFullAnalysis(id, response.id).catch(err => {
+      console.error('Agent analysis failed for response:', response.id, err);
+      // Don't block response submission on analysis failure
     });
     
     // Get progress
