@@ -96,6 +96,8 @@ describe('POST /api/uploads/sign', () => {
         fileName: 'recording.mp4',
         mimeType: 'video/mp4',
         contentLength: 1000,
+        interviewId: 'int-123',
+        responseId: 'resp-456',
       }),
     );
 
@@ -110,6 +112,8 @@ describe('POST /api/uploads/sign', () => {
         fileName: 'recording.webm',
         mimeType: 'audio/webm',
         contentLength: 30 * 1024 * 1024, // 30 MB
+        interviewId: 'int-123',
+        responseId: 'resp-456',
       }),
     );
 
@@ -153,5 +157,19 @@ describe('POST /api/uploads/sign', () => {
   it('returns 400 for missing required fields', async () => {
     const res = await POST(makeRequest({}));
     expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when interviewId or responseId missing', async () => {
+    const res = await POST(
+      makeRequest({
+        fileName: 'recording.webm',
+        mimeType: 'audio/webm',
+        contentLength: 1000,
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toContain('interviewId and responseId are required');
   });
 });

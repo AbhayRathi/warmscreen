@@ -80,7 +80,9 @@ export async function getSignedPutUrl(
 
   const publicUrl = voiceEnv.STORAGE_PUBLIC_BASE_URL
     ? `${voiceEnv.STORAGE_PUBLIC_BASE_URL.replace(/\/+$/, '')}/${key}`
-    : `https://${voiceEnv.STORAGE_BUCKET}.s3.${voiceEnv.STORAGE_REGION}.amazonaws.com/${key}`;
+    : voiceEnv.STORAGE_PROVIDER === 'r2' && voiceEnv.R2_ACCOUNT_ID
+      ? `https://${voiceEnv.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${voiceEnv.STORAGE_BUCKET}/${key}`
+      : `https://${voiceEnv.STORAGE_BUCKET}.s3.${voiceEnv.STORAGE_REGION}.amazonaws.com/${key}`;
 
   return {
     uploadUrl,

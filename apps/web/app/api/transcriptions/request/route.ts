@@ -21,10 +21,18 @@ const RequestSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// In-flight job tracker (idempotency)
+// In-flight job tracker (idempotency) with TTL-based cleanup
 // ---------------------------------------------------------------------------
 
-const inflightJobs = new Set<string>();
+const JOB_TTL_MS = 10 * 60 * 1000; // 10 minutes max per job
+const inflightJobs = new Map<string, number>();
+
+function cleanupInflightJobs() {
+  const cutoff = Date.now() - JOB_TTL_MS;
+  for (const [key, ts] of inflightJobs) {
+    if (ts < cutoff) inflightJobs.delete(key);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Rate-limit config
@@ -67,6 +75,7 @@ export async function POST(req: NextRequest) {
     const validated = RequestSchema.parse(body);
 
     // Idempotency: skip if already in-flight or completed
+    cleanupInflightJobs();
     if (inflightJobs.has(validated.responseId)) {
       logger.info({ responseId: validated.responseId }, 'duplicate request – already in-flight');
       return NextResponse.json(
@@ -90,7 +99,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Mark in-flight
-    inflightJobs.add(validated.responseId);
+    inflightJobs.set(validated.responseId, Date.now());
 
     logger.info(
       { responseId: validated.responseId, mimeType: validated.mimeType },

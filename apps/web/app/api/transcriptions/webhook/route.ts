@@ -19,10 +19,18 @@ const WebhookSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Idempotency tracker
+// Idempotency tracker (TTL-based to avoid unbounded growth)
 // ---------------------------------------------------------------------------
 
-const processedWebhooks = new Set<string>();
+const WEBHOOK_DEDUP_TTL_MS = 60 * 60 * 1000; // 1 hour
+const processedWebhooks = new Map<string, number>();
+
+function cleanupWebhookDedup() {
+  const cutoff = Date.now() - WEBHOOK_DEDUP_TTL_MS;
+  for (const [key, ts] of processedWebhooks) {
+    if (ts < cutoff) processedWebhooks.delete(key);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Rate-limit config
@@ -70,6 +78,7 @@ export async function POST(req: NextRequest) {
     const validated = WebhookSchema.parse(body);
 
     // Idempotency: skip duplicate webhooks
+    cleanupWebhookDedup();
     if (processedWebhooks.has(validated.responseId)) {
       logger.info(
         { responseId: validated.responseId },
@@ -90,7 +99,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Mark as processed
-    processedWebhooks.add(validated.responseId);
+    processedWebhooks.set(validated.responseId, Date.now());
 
     logger.info(
       { responseId: validated.responseId, language: validated.language },

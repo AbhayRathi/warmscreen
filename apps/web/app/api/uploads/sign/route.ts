@@ -86,8 +86,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Build storage key with strict prefix
-    const interviewId = validated.interviewId ?? 'unknown';
-    const responseId = validated.responseId ?? 'unknown';
+    const interviewId = validated.interviewId;
+    const responseId = validated.responseId;
+
+    if (!interviewId || !responseId) {
+      return NextResponse.json(
+        { error: 'interviewId and responseId are required' },
+        { status: 400 },
+      );
+    }
+
     const ext = validated.fileName.split('.').pop() || 'webm';
     const key = `interviews/${interviewId}/responses/${responseId}.${ext}`;
 
