@@ -158,7 +158,8 @@ async function callWhisper(
 
   // Build a File object from the buffer
   const ext = mimeType.split('/')[1] || 'webm';
-  const file = new File([audioBuffer], `audio.${ext}`, { type: mimeType });
+  const uint8 = new Uint8Array(audioBuffer);
+  const file = new File([uint8], `audio.${ext}`, { type: mimeType });
 
   const response = await client.audio.transcriptions.create({
     model: 'whisper-1',
