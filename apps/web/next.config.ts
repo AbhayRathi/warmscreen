@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   },
   
   // Exclude pino from server-side bundling (it's a Node.js module)
-  serverExternalPackages: ['pino', 'pino-pretty', 'thread-stream'],
+  serverExternalPackages: ['pino', 'pino-pretty', 'thread-stream', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner'],
   
   // Empty turbopack config to allow the build to proceed
   turbopack: {},

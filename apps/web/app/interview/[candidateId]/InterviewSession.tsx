@@ -6,6 +6,7 @@ import ProgressBar from '@/components/interview/ProgressBar';
 import QuestionCard from '@/components/interview/QuestionCard';
 import ResponseInput from '@/components/interview/ResponseInput';
 import InterviewComplete from '@/components/interview/InterviewComplete';
+import RecorderPanel from '@/components/voice/RecorderPanel';
 
 interface InterviewData {
   id: string;
@@ -44,6 +45,9 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalResponses, setTotalResponses] = useState(0);
+  const [voiceEnabled] = useState(
+    () => typeof window !== 'undefined' && process.env.NEXT_PUBLIC_VOICE_ENABLED === 'true',
+  );
 
   // Load interview session
   const loadSession = useCallback(async () => {
@@ -259,6 +263,13 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
               isLoading={isSubmitting}
               questionId={currentQuestion.id}
             />
+            {voiceEnabled && (
+              <RecorderPanel
+                interviewId={interview.id}
+                responseId={undefined}
+                onTranscriptionComplete={() => loadSession()}
+              />
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow p-8 text-center">
