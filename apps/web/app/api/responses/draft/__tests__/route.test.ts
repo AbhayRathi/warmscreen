@@ -116,4 +116,26 @@ describe('POST /api/responses/draft', () => {
     const data = await res.json();
     expect(data.error).toContain('not in progress');
   });
+
+  it('returns existing draft if one already exists for the same question', async () => {
+    prismaMock.interview.findUnique.mockResolvedValue({
+      id: 'int-123',
+      status: 'IN_PROGRESS',
+    });
+    prismaMock.response.findFirst.mockResolvedValue({
+      id: 'existing-draft-id',
+    });
+
+    const res = await POST(
+      makeRequest({
+        interviewId: 'int-123',
+        questionId: 'q-789',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.id).toBe('existing-draft-id');
+    expect(prismaMock.response.create).not.toHaveBeenCalled();
+  });
 });

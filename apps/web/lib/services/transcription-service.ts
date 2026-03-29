@@ -1,6 +1,6 @@
 import { voiceEnv, getMaxAudioBytes } from '@/lib/env';
 import OpenAI from 'openai';
-import type { Transcription } from 'openai/resources/audio/transcriptions';
+import type { TranscriptionVerbose } from 'openai/resources/audio/transcriptions';
 import pino from 'pino';
 
 const logger = pino({ name: 'transcription-service' });
@@ -177,15 +177,11 @@ async function callWhisper(
     model: 'whisper-1',
     file,
     response_format: 'verbose_json',
-  });
+  }) as TranscriptionVerbose;
 
-  const transcription = response as Transcription;
-  const transcript = normalizeTranscript(transcription.text ?? '');
-  const language =
-    (response as unknown as { language?: string }).language ?? 'en';
-  const durationSec = Math.round(
-    (response as unknown as { duration?: number }).duration ?? 0,
-  );
+  const transcript = normalizeTranscript(response.text ?? '');
+  const language = response.language ?? 'en';
+  const durationSec = Math.round(response.duration ?? 0);
 
   return { transcript, language, durationSec };
 }

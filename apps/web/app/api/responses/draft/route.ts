@@ -42,6 +42,21 @@ export async function POST(req: NextRequest) {
     }
 
     // Create a draft response with empty transcript (placeholder)
+    // Return existing draft if one already exists for this question
+    const existing = await prisma.response.findFirst({
+      where: {
+        interviewId: validated.interviewId,
+        questionId: validated.questionId,
+        transcript: '',
+        audioUrl: null,
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      logger.info({ responseId: existing.id }, 'returning existing draft response');
+      return NextResponse.json({ id: existing.id }, { status: 200 });
+    }
+
     const response = await prisma.response.create({
       data: {
         interviewId: validated.interviewId,

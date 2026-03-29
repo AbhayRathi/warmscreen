@@ -48,6 +48,7 @@ export default function RecorderPanel({
   const [activeResponseId, setActiveResponseId] = useState<string | undefined>(initialResponseId);
   const [lastAudioUrl, setLastAudioUrl] = useState<string | null>(null);
   const [lastMimeType, setLastMimeType] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
 
   /** Poll transcription status endpoint */
   const pollTranscriptionStatus = useCallback(
@@ -71,13 +72,17 @@ export default function RecorderPanel({
           // Ignore transient fetch errors during polling
         }
       }
-      // After all attempts, leave status as transcribing — don't error
+      // After all poll attempts exhausted, surface a timeout error
+      setUploadProgress('error');
+      setErrorMsg('Transcription timed out — please retry.');
     },
     [onTranscriptionComplete],
   );
 
   /** Handle record button: obtain responseId before starting */
   const handleStart = async () => {
+    if (isStarting) return;
+    setIsStarting(true);
     try {
       let respId = activeResponseId;
       if (onBeforeRecord) {
@@ -87,6 +92,8 @@ export default function RecorderPanel({
       await start();
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Failed to start recording');
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -195,8 +202,9 @@ export default function RecorderPanel({
         {!isRecording && uploadProgress === 'idle' && (
           <button
             onClick={handleStart}
+            disabled={isStarting}
             aria-label="Start recording"
-            className="flex-1 bg-red-600 text-white text-sm py-2 px-4 rounded-lg hover:bg-red-700 transition"
+            className="flex-1 bg-red-600 text-white text-sm py-2 px-4 rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             🎙 Record
           </button>

@@ -2,11 +2,14 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { fetcher, apiPost } from '@/lib/api';
+import pino from 'pino';
 import ProgressBar from '@/components/interview/ProgressBar';
 import QuestionCard from '@/components/interview/QuestionCard';
 import ResponseInput from '@/components/interview/ResponseInput';
 import InterviewComplete from '@/components/interview/InterviewComplete';
 import RecorderPanel from '@/components/voice/RecorderPanel';
+
+const logger = pino({ name: 'interview-session' });
 
 interface InterviewData {
   id: string;
@@ -68,8 +71,8 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
       setCurrentQuestion(data.currentQuestion);
       setProgress(data.progress);
       setTotalResponses(data.responses?.length || 0);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load interview session');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load interview session');
     } finally {
       setIsLoading(false);
     }
@@ -87,8 +90,8 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
       
       setInterview((prev) => prev ? { ...prev, status: 'IN_PROGRESS', startedAt: new Date().toISOString() } : null);
       setCurrentQuestion(data.firstQuestion);
-    } catch (err: any) {
-      setError(err.message || 'Failed to start interview');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to start interview');
     } finally {
       setIsLoading(false);
     }
@@ -118,8 +121,8 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
         setCurrentQuestion(data.nextQuestion);
         setDraftResponseId(null);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit response');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to submit response');
     } finally {
       setIsSubmitting(false);
     }
@@ -136,7 +139,7 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
       setCurrentQuestion(null);
     } catch (error) {
       // Log the error for debugging
-      console.error('Error completing interview:', error);
+      logger.error({ error }, 'Error completing interview');
       // If completion fails due to not enough questions, we still mark it complete from the UI
       // This handles edge cases where the user sees completion but the API call fails
       setInterview((prev) => prev ? { ...prev, status: 'COMPLETED', completedAt: new Date().toISOString() } : null);
