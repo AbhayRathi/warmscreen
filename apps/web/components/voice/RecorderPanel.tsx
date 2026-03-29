@@ -53,7 +53,9 @@ export default function RecorderPanel({
   const pollTranscriptionStatus = useCallback(
     async (respId: string) => {
       for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        // First attempt has shorter delay for faster feedback
+        const delay = attempt === 0 ? 2_000 : POLL_INTERVAL_MS;
+        await new Promise((r) => setTimeout(r, delay));
         try {
           const res = await fetch(
             `/api/transcriptions/status?responseId=${encodeURIComponent(respId)}`,
