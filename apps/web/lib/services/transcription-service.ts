@@ -1,4 +1,6 @@
 import { voiceEnv, getMaxAudioBytes } from '@/lib/env';
+import OpenAI from 'openai';
+import type { Transcription } from 'openai/resources/audio/transcriptions';
 import pino from 'pino';
 
 const logger = pino({ name: 'transcription-service' });
@@ -141,20 +143,30 @@ export async function transcribeAudio(
 }
 
 // ---------------------------------------------------------------------------
-// OpenAI Whisper call
+// OpenAI Whisper call — lazy singleton client
 // ---------------------------------------------------------------------------
+
+let _openai: OpenAI | null = null;
+function getOpenAIClient(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY || '',
+      timeout: TIMEOUT_MS,
+    });
+  }
+  return _openai;
+}
+
+/** Reset OpenAI client — for tests */
+export function resetOpenAIClient(): void {
+  _openai = null;
+}
 
 async function callWhisper(
   audioBuffer: Buffer,
   mimeType: string,
 ): Promise<TranscribeResult> {
-  // Dynamically import to reuse project's openai client pattern
-  const { default: OpenAI } = await import('openai');
-
-  const client = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || '',
-    timeout: TIMEOUT_MS,
-  });
+  const client = getOpenAIClient();
 
   // Build a File object from the buffer
   const ext = mimeType.split('/')[1] || 'webm';
@@ -167,9 +179,8 @@ async function callWhisper(
     response_format: 'verbose_json',
   });
 
-  const transcript = normalizeTranscript(
-    (response as unknown as { text: string }).text ?? '',
-  );
+  const transcription = response as Transcription;
+  const transcript = normalizeTranscript(transcription.text ?? '');
   const language =
     (response as unknown as { language?: string }).language ?? 'en';
   const durationSec = Math.round(

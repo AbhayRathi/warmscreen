@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth/session';
 import { getSignedPutUrl } from '@/lib/storage/s3';
 import { isAllowedMimeType, getMaxAudioBytes, isVoiceEnabled } from '@/lib/env';
 import { checkRateLimit } from '@/lib/rate-limit';
+import prisma from '@/lib/db/prisma';
 import pino from 'pino';
 
 const logger = pino({ name: 'uploads-sign' });
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
     if (!rl.allowed) {
       return NextResponse.json(
         { error: 'Too many requests', retryAfterSec: rl.retryAfterSec },
-        { status: 429 },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.retryAfterSec ?? 0)) } },
       );
     }
 
@@ -94,6 +95,15 @@ export async function POST(req: NextRequest) {
         { error: 'interviewId and responseId are required' },
         { status: 400 },
       );
+    }
+
+    // Validate that the response exists and belongs to the interview
+    const existingResponse = await prisma.response.findUnique({
+      where: { id: responseId },
+      select: { id: true, interviewId: true },
+    });
+    if (!existingResponse || existingResponse.interviewId !== interviewId) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
     const ext = validated.fileName.split('.').pop() || 'webm';

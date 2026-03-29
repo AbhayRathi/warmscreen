@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { getSession } from '@/lib/auth/session';
 import { transcribeAudio } from '@/lib/services/transcription-service';
 import prisma from '@/lib/db/prisma';
+import { waitUntil } from '@vercel/functions';
 import pino from 'pino';
 
 const logger = pino({ name: 'transcriptions-request' });
@@ -41,6 +42,39 @@ function cleanupInflightJobs() {
 const TRANSCRIPTION_RATE_LIMIT = { maxRequests: 10, windowSec: 60 };
 
 // ---------------------------------------------------------------------------
+// Background transcription (used with waitUntil for serverless)
+// ---------------------------------------------------------------------------
+
+async function runTranscription(
+  responseId: string,
+  audioUrl: string,
+  mimeType: string,
+  durationSec?: number,
+): Promise<void> {
+  try {
+    const result = await transcribeAudio({ audioUrl, mimeType });
+
+    await prisma.response.update({
+      where: { id: responseId },
+      data: {
+        audioUrl,
+        transcript: result.transcript,
+        duration: result.durationSec || durationSec || 0,
+      },
+    });
+
+    logger.info({ responseId }, 'transcription persisted');
+  } catch (err) {
+    logger.error(
+      { responseId, error: (err as Error).message },
+      'transcription failed',
+    );
+  } finally {
+    inflightJobs.delete(responseId);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
 
@@ -66,7 +100,7 @@ export async function POST(req: NextRequest) {
     if (!rl.allowed) {
       return NextResponse.json(
         { error: 'Too many requests', retryAfterSec: rl.retryAfterSec },
-        { status: 429 },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.retryAfterSec ?? 0)) } },
       );
     }
 
@@ -87,10 +121,10 @@ export async function POST(req: NextRequest) {
     // Check if transcript already exists
     const existing = await prisma.response.findUnique({
       where: { id: validated.responseId },
-      select: { audioUrl: true },
+      select: { transcript: true, audioUrl: true },
     });
 
-    if (existing?.audioUrl) {
+    if (existing?.transcript) {
       logger.info({ responseId: validated.responseId }, 'duplicate request – already transcribed');
       return NextResponse.json(
         { status: 'already_completed', responseId: validated.responseId },
@@ -106,33 +140,15 @@ export async function POST(req: NextRequest) {
       'transcription enqueued',
     );
 
-    // Fire-and-forget async transcription
-    (async () => {
-      try {
-        const result = await transcribeAudio({
-          audioUrl: validated.audioUrl,
-          mimeType: validated.mimeType,
-        });
-
-        await prisma.response.update({
-          where: { id: validated.responseId },
-          data: {
-            audioUrl: validated.audioUrl,
-            transcript: result.transcript,
-            duration: result.durationSec || validated.durationSec || 0,
-          },
-        });
-
-        logger.info({ responseId: validated.responseId }, 'transcription persisted');
-      } catch (err) {
-        logger.error(
-          { responseId: validated.responseId, error: (err as Error).message },
-          'transcription failed',
-        );
-      } finally {
-        inflightJobs.delete(validated.responseId);
-      }
-    })();
+    // Enqueue async transcription via waitUntil (survives serverless response)
+    waitUntil(
+      runTranscription(
+        validated.responseId,
+        validated.audioUrl,
+        validated.mimeType,
+        validated.durationSec,
+      ),
+    );
 
     return NextResponse.json(
       { status: 'accepted', responseId: validated.responseId },

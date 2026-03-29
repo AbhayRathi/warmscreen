@@ -76,6 +76,13 @@ function getVoiceEnv(): VoiceEnv {
 
 export const voiceEnv = getVoiceEnv();
 
+// Warn about in-memory rate limiter in multi-instance deployments
+if (voiceEnv.VOICE_ENABLED && !process.env.REDIS_URL) {
+  console.warn(
+    '[voice] REDIS_URL not set — rate limiting uses in-memory store, ineffective on multi-instance deployments.',
+  );
+}
+
 /** Check whether voice features are enabled and properly configured */
 export function isVoiceEnabled(): boolean {
   return voiceEnv.VOICE_ENABLED;

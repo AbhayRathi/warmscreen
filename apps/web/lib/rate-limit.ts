@@ -4,6 +4,8 @@
  * For production use this should be backed by Redis/KV, but the in-memory
  * approach is fine for single-instance deploys and keeps the implementation
  * fully deterministic for tests.
+ *
+ * TODO: Replace with Redis/Upstash sliding window for multi-instance/serverless correctness.
  */
 
 interface RateLimitEntry {

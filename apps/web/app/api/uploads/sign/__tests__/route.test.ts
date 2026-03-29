@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import {
+  prismaMock,
+  resetMocks,
+} from '@/lib/test-utils/prisma-mock';
 
 // Mock dependencies
+vi.mock('@/lib/db/prisma', () => ({
+  default: prismaMock,
+}));
+
 vi.mock('@/lib/auth/session', () => ({
   getSession: vi.fn().mockResolvedValue({ userId: 'test-user', isLoggedIn: true }),
 }));
@@ -53,8 +61,14 @@ function makeRequest(body: unknown, headers?: Record<string, string>): NextReque
 describe('POST /api/uploads/sign', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetMocks();
     vi.mocked(isVoiceEnabled).mockReturnValue(true);
     vi.mocked(checkRateLimit).mockReturnValue({ allowed: true, remaining: 9 });
+    // Default: response exists in DB with matching interviewId
+    prismaMock.response.findUnique.mockResolvedValue({
+      id: 'resp-456',
+      interviewId: 'int-123',
+    });
   });
 
   it('returns signed URL for valid request', async () => {
@@ -171,5 +185,63 @@ describe('POST /api/uploads/sign', () => {
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toContain('interviewId and responseId are required');
+  });
+
+  it('returns 404 when responseId not found in DB', async () => {
+    prismaMock.response.findUnique.mockResolvedValue(null);
+
+    const res = await POST(
+      makeRequest({
+        fileName: 'recording.webm',
+        mimeType: 'audio/webm',
+        contentLength: 1000,
+        interviewId: 'int-123',
+        responseId: 'resp-nonexistent',
+      }),
+    );
+
+    expect(res.status).toBe(404);
+    const data = await res.json();
+    expect(data.error).toBe('Not found');
+  });
+
+  it('returns 404 when responseId belongs to different interview', async () => {
+    prismaMock.response.findUnique.mockResolvedValue({
+      id: 'resp-456',
+      interviewId: 'other-interview',
+    });
+
+    const res = await POST(
+      makeRequest({
+        fileName: 'recording.webm',
+        mimeType: 'audio/webm',
+        contentLength: 1000,
+        interviewId: 'int-123',
+        responseId: 'resp-456',
+      }),
+    );
+
+    expect(res.status).toBe(404);
+    const data = await res.json();
+    expect(data.error).toBe('Not found');
+  });
+
+  it('returns Retry-After header on 429', async () => {
+    vi.mocked(checkRateLimit).mockReturnValue({
+      allowed: false,
+      remaining: 0,
+      retryAfterSec: 30,
+    });
+
+    const res = await POST(
+      makeRequest({
+        fileName: 'recording.webm',
+        mimeType: 'audio/webm',
+        contentLength: 1000,
+      }),
+    );
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Retry-After')).toBe('30');
   });
 });

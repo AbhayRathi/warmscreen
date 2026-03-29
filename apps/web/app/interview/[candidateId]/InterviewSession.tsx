@@ -48,6 +48,13 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
   const [voiceEnabled] = useState(
     () => typeof window !== 'undefined' && process.env.NEXT_PUBLIC_VOICE_ENABLED === 'true',
   );
+  const [draftResponseId, setDraftResponseId] = useState<string | null>(null);
+
+  /** Create a draft response so we have a valid responseId for audio upload */
+  const createDraftResponse = async (interviewId: string, questionId: string): Promise<string> => {
+    const data = await apiPost('/api/responses/draft', { interviewId, questionId });
+    return data.id;
+  };
 
   // Load interview session
   const loadSession = useCallback(async () => {
@@ -109,6 +116,7 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
         await completeInterview();
       } else {
         setCurrentQuestion(data.nextQuestion);
+        setDraftResponseId(null);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to submit response');
@@ -266,7 +274,16 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
             {voiceEnabled && (
               <RecorderPanel
                 interviewId={interview.id}
-                responseId={undefined}
+                questionId={currentQuestion.id}
+                responseId={draftResponseId ?? undefined}
+                onBeforeRecord={async () => {
+                  if (!draftResponseId && interview && currentQuestion) {
+                    const id = await createDraftResponse(interview.id, currentQuestion.id);
+                    setDraftResponseId(id);
+                    return id;
+                  }
+                  return draftResponseId!;
+                }}
                 onTranscriptionComplete={() => loadSession()}
               />
             )}

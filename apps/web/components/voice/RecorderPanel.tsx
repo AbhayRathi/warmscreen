@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRecorder } from '@/lib/voice/useRecorder';
 import LevelMeter from './LevelMeter';
 import { apiPost } from '@/lib/api';
@@ -8,6 +8,8 @@ import { apiPost } from '@/lib/api';
 interface RecorderPanelProps {
   responseId?: string;
   interviewId?: string;
+  questionId?: string;
+  onBeforeRecord?: () => Promise<string>;
   onTranscriptionComplete?: () => void;
 }
 
@@ -17,9 +19,14 @@ function formatTime(sec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+const POLL_INTERVAL_MS = 5_000;
+const POLL_MAX_ATTEMPTS = 3;
+
 export default function RecorderPanel({
-  responseId,
+  responseId: initialResponseId,
   interviewId,
+  questionId,
+  onBeforeRecord,
   onTranscriptionComplete,
 }: RecorderPanelProps) {
   const {
@@ -38,10 +45,59 @@ export default function RecorderPanel({
     'idle' | 'uploading' | 'transcribing' | 'done' | 'error'
   >('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [activeResponseId, setActiveResponseId] = useState<string | undefined>(initialResponseId);
+  const [lastAudioUrl, setLastAudioUrl] = useState<string | null>(null);
+  const [lastMimeType, setLastMimeType] = useState<string | null>(null);
+
+  /** Poll transcription status endpoint */
+  const pollTranscriptionStatus = useCallback(
+    async (respId: string) => {
+      for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        try {
+          const res = await fetch(
+            `/api/transcriptions/status?responseId=${encodeURIComponent(respId)}`,
+          );
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (data.status === 'completed') {
+            setUploadProgress('done');
+            onTranscriptionComplete?.();
+            return;
+          }
+        } catch {
+          // Ignore transient fetch errors during polling
+        }
+      }
+      // After all attempts, leave status as transcribing — don't error
+    },
+    [onTranscriptionComplete],
+  );
+
+  /** Handle record button: obtain responseId before starting */
+  const handleStart = async () => {
+    try {
+      let respId = activeResponseId;
+      if (onBeforeRecord) {
+        respId = await onBeforeRecord();
+        setActiveResponseId(respId);
+      }
+      await start();
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to start recording');
+    }
+  };
 
   const handleStop = async () => {
     const blob = await stop();
     if (!blob) return;
+
+    const respId = activeResponseId;
+    if (!respId) {
+      setUploadProgress('error');
+      setErrorMsg('No response ID available. Please try again.');
+      return;
+    }
 
     try {
       setUploadProgress('uploading');
@@ -54,7 +110,7 @@ export default function RecorderPanel({
         mimeType: blob.type,
         contentLength: blob.size,
         interviewId,
-        responseId,
+        responseId: respId,
       });
 
       // 2. Upload blob to signed URL
@@ -70,18 +126,49 @@ export default function RecorderPanel({
 
       // 3. Request transcription
       setUploadProgress('transcribing');
-      await apiPost('/api/transcriptions/request', {
-        responseId,
+      setLastAudioUrl(signResult.publicUrl);
+      setLastMimeType(blob.type);
+
+      const txRes = await apiPost('/api/transcriptions/request', {
+        responseId: respId,
         audioUrl: signResult.publicUrl,
         mimeType: blob.type,
         durationSec,
       });
 
-      setUploadProgress('done');
-      onTranscriptionComplete?.();
+      if (txRes.status === 'accepted' || txRes.status === 'already_in_progress') {
+        // Start lightweight polling for completion
+        pollTranscriptionStatus(respId);
+      } else if (txRes.status === 'already_completed') {
+        setUploadProgress('done');
+        onTranscriptionComplete?.();
+      }
     } catch (err: unknown) {
       setUploadProgress('error');
       setErrorMsg(err instanceof Error ? err.message : 'Upload failed');
+    }
+  };
+
+  /** Retry transcription request */
+  const handleRetry = async () => {
+    const respId = activeResponseId;
+    if (!respId || !lastAudioUrl || !lastMimeType) return;
+
+    try {
+      setUploadProgress('transcribing');
+      setErrorMsg(null);
+
+      await apiPost('/api/transcriptions/request', {
+        responseId: respId,
+        audioUrl: lastAudioUrl,
+        mimeType: lastMimeType,
+        durationSec,
+      });
+
+      pollTranscriptionStatus(respId);
+    } catch (err: unknown) {
+      setUploadProgress('error');
+      setErrorMsg(err instanceof Error ? err.message : 'Retry failed');
     }
   };
 
@@ -105,7 +192,8 @@ export default function RecorderPanel({
       <div className="flex gap-2">
         {!isRecording && uploadProgress === 'idle' && (
           <button
-            onClick={start}
+            onClick={handleStart}
+            aria-label="Start recording"
             className="flex-1 bg-red-600 text-white text-sm py-2 px-4 rounded-lg hover:bg-red-700 transition"
           >
             🎙 Record
@@ -116,12 +204,14 @@ export default function RecorderPanel({
           <>
             <button
               onClick={pause}
+              aria-label="Pause recording"
               className="flex-1 bg-yellow-500 text-white text-sm py-2 px-4 rounded-lg hover:bg-yellow-600 transition"
             >
               ⏸ Pause
             </button>
             <button
               onClick={handleStop}
+              aria-label="Stop recording"
               className="flex-1 bg-gray-700 text-white text-sm py-2 px-4 rounded-lg hover:bg-gray-800 transition"
             >
               ⏹ Stop
@@ -133,12 +223,14 @@ export default function RecorderPanel({
           <>
             <button
               onClick={resume}
+              aria-label="Resume recording"
               className="flex-1 bg-green-600 text-white text-sm py-2 px-4 rounded-lg hover:bg-green-700 transition"
             >
               ▶ Resume
             </button>
             <button
               onClick={handleStop}
+              aria-label="Stop recording"
               className="flex-1 bg-gray-700 text-white text-sm py-2 px-4 rounded-lg hover:bg-gray-800 transition"
             >
               ⏹ Stop
@@ -158,9 +250,24 @@ export default function RecorderPanel({
         <p className="text-xs text-green-600">Transcription complete ✓</p>
       )}
 
-      {/* Error */}
+      {/* Error + Retry */}
       {displayError && (
-        <p className="text-xs text-red-600">{displayError}</p>
+        <div className="space-y-2">
+          <p className="text-xs text-red-600">
+            {uploadProgress === 'error'
+              ? 'Transcription failed — please re-record or try again.'
+              : displayError}
+          </p>
+          {uploadProgress === 'error' && lastAudioUrl && (
+            <button
+              onClick={handleRetry}
+              aria-label="Retry transcription"
+              className="text-xs bg-indigo-100 text-indigo-700 py-1 px-3 rounded hover:bg-indigo-200 transition"
+            >
+              Retry
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

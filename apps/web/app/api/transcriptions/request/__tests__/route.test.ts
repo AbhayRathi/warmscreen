@@ -30,6 +30,10 @@ vi.mock('@/lib/services/transcription-service', () => ({
   }),
 }));
 
+vi.mock('@vercel/functions', () => ({
+  waitUntil: vi.fn(),
+}));
+
 vi.mock('pino', () => ({
   default: () => ({
     info: vi.fn(),
@@ -41,6 +45,7 @@ vi.mock('pino', () => ({
 import { POST } from '@/app/api/transcriptions/request/route';
 import { isVoiceEnabled } from '@/lib/env';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { waitUntil } from '@vercel/functions';
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest('http://localhost/api/transcriptions/request', {
@@ -107,9 +112,10 @@ describe('POST /api/transcriptions/request', () => {
     expect(res.status).toBe(429);
   });
 
-  it('returns 202 already_completed when audioUrl exists', async () => {
+  it('returns 202 already_completed when transcript exists', async () => {
     prismaMock.response.findUnique.mockResolvedValue({
       id: 'resp-123',
+      transcript: 'Previously transcribed text',
       audioUrl: 'https://cdn.example.com/existing.webm',
     });
 
@@ -141,5 +147,58 @@ describe('POST /api/transcriptions/request', () => {
     );
 
     expect(res.status).toBe(400);
+  });
+
+  it('calls waitUntil for accepted requests', async () => {
+    await POST(
+      makeRequest({
+        responseId: 'resp-wait-123',
+        audioUrl: 'https://cdn.example.com/audio.webm',
+        mimeType: 'audio/webm',
+        durationSec: 10,
+      }),
+    );
+
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns Retry-After header on 429', async () => {
+    vi.mocked(checkRateLimit).mockReturnValue({
+      allowed: false,
+      remaining: 0,
+      retryAfterSec: 15,
+    });
+
+    const res = await POST(
+      makeRequest({
+        responseId: 'resp-123',
+        audioUrl: 'https://cdn.example.com/audio.webm',
+        mimeType: 'audio/webm',
+      }),
+    );
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Retry-After')).toBe('15');
+  });
+
+  it('idempotency checks transcript not audioUrl', async () => {
+    // Response has audioUrl but no transcript — should still be accepted
+    prismaMock.response.findUnique.mockResolvedValue({
+      id: 'resp-123',
+      audioUrl: 'https://cdn.example.com/existing.webm',
+      transcript: null,
+    });
+
+    const res = await POST(
+      makeRequest({
+        responseId: 'resp-123',
+        audioUrl: 'https://cdn.example.com/audio.webm',
+        mimeType: 'audio/webm',
+      }),
+    );
+
+    expect(res.status).toBe(202);
+    const data = await res.json();
+    expect(data.status).toBe('accepted');
   });
 });
