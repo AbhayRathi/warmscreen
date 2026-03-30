@@ -11,6 +11,15 @@ const publicPaths = [
 // API paths that should return 401 instead of redirecting
 const apiPaths = ['/api/'];
 
+function addSecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()');
+  response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' http://localhost:* https:;");
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
@@ -22,6 +31,15 @@ export async function middleware(request: NextRequest) {
   // Special case: allow POST to /api/session (for login)
   if (pathname === '/api/session' && request.method === 'POST') {
     return NextResponse.next();
+  }
+  
+  // Allow voice API routes for candidates (interview pages are public)
+  if (
+    pathname.startsWith('/api/uploads/sign') ||
+    pathname.startsWith('/api/transcriptions/') ||
+    pathname.startsWith('/api/responses/draft')
+  ) {
+    return addSecurityHeaders(NextResponse.next());
   }
   
   // Validate session for protected routes
@@ -49,14 +67,7 @@ export async function middleware(request: NextRequest) {
   }
   
   // Add security headers to response
-  const response = NextResponse.next();
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' http://localhost:* https:;");
-  
-  return response;
+  return addSecurityHeaders(NextResponse.next());
 }
 
 export const config = {

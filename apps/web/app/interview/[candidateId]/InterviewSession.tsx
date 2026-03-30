@@ -2,10 +2,14 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { fetcher, apiPost } from '@/lib/api';
+import pino from 'pino';
 import ProgressBar from '@/components/interview/ProgressBar';
 import QuestionCard from '@/components/interview/QuestionCard';
 import ResponseInput from '@/components/interview/ResponseInput';
 import InterviewComplete from '@/components/interview/InterviewComplete';
+import RecorderPanel from '@/components/voice/RecorderPanel';
+
+const logger = pino({ name: 'interview-session' });
 
 interface InterviewData {
   id: string;
@@ -44,6 +48,16 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalResponses, setTotalResponses] = useState(0);
+  const [voiceEnabled] = useState(
+    () => typeof window !== 'undefined' && process.env.NEXT_PUBLIC_VOICE_ENABLED === 'true',
+  );
+  const [draftResponseId, setDraftResponseId] = useState<string | null>(null);
+
+  /** Create a draft response so we have a valid responseId for audio upload */
+  const createDraftResponse = async (interviewId: string, questionId: string): Promise<string> => {
+    const data = await apiPost('/api/responses/draft', { interviewId, questionId });
+    return data.id;
+  };
 
   // Load interview session
   const loadSession = useCallback(async () => {
@@ -57,8 +71,8 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
       setCurrentQuestion(data.currentQuestion);
       setProgress(data.progress);
       setTotalResponses(data.responses?.length || 0);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load interview session');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load interview session');
     } finally {
       setIsLoading(false);
     }
@@ -76,8 +90,8 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
       
       setInterview((prev) => prev ? { ...prev, status: 'IN_PROGRESS', startedAt: new Date().toISOString() } : null);
       setCurrentQuestion(data.firstQuestion);
-    } catch (err: any) {
-      setError(err.message || 'Failed to start interview');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to start interview');
     } finally {
       setIsLoading(false);
     }
@@ -105,9 +119,10 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
         await completeInterview();
       } else {
         setCurrentQuestion(data.nextQuestion);
+        setDraftResponseId(null);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit response');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to submit response');
     } finally {
       setIsSubmitting(false);
     }
@@ -124,7 +139,7 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
       setCurrentQuestion(null);
     } catch (error) {
       // Log the error for debugging
-      console.error('Error completing interview:', error);
+      logger.error({ error }, 'Error completing interview');
       // If completion fails due to not enough questions, we still mark it complete from the UI
       // This handles edge cases where the user sees completion but the API call fails
       setInterview((prev) => prev ? { ...prev, status: 'COMPLETED', completedAt: new Date().toISOString() } : null);
@@ -259,6 +274,22 @@ export default function InterviewSession({ candidateId }: InterviewSessionProps)
               isLoading={isSubmitting}
               questionId={currentQuestion.id}
             />
+            {voiceEnabled && (
+              <RecorderPanel
+                interviewId={interview.id}
+                questionId={currentQuestion.id}
+                responseId={draftResponseId ?? undefined}
+                onBeforeRecord={async () => {
+                  if (!draftResponseId && interview && currentQuestion) {
+                    const id = await createDraftResponse(interview.id, currentQuestion.id);
+                    setDraftResponseId(id);
+                    return id;
+                  }
+                  return draftResponseId!;
+                }}
+                onTranscriptionComplete={() => loadSession()}
+              />
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow p-8 text-center">
