@@ -490,6 +490,9 @@ export async function analyzeResponse(params: {
         },
       },
     });
+    if (!response) {
+      throw new Error(`Response ${params.responseId} not found`);
+    }
 
     const result = await getConductor().processResponse({
       interviewId: params.interviewId,
@@ -629,8 +632,13 @@ function extractScores(analyzedOutput: AgentOutput): Record<string, number> {
 }
 
 function extractSentiment(taggedOutput: AgentOutput): number | null {
-  const result = taggedOutput?.result as { sentiment?: unknown };
-  return typeof result?.sentiment === 'number' && Number.isFinite(result.sentiment)
-    ? result.sentiment
-    : null;
+  return extractNumericField(taggedOutput?.result as { sentiment?: unknown }, 'sentiment');
+}
+
+function extractNumericField(
+  obj: Record<string, unknown> | null | undefined,
+  key: string,
+): number | null {
+  const value = obj?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
