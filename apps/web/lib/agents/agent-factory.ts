@@ -7,6 +7,8 @@
 
 import { AgentType as PrismaAgentType } from '@warmscreen/database';
 import { AgentOutput } from '@warmscreen/shared';
+import { ConductorAgent, ReflexionSystem } from '@warmscreen/agents';
+import pino from 'pino';
 
 import {
   AgentTypes,
@@ -27,6 +29,21 @@ import { createAgentLog, CreateAgentLogInput } from '../db/agent-log';
 import { getResponseById } from '../db/response';
 import { getInterviewById } from '../db/interview';
 import prisma from '../db/prisma';
+
+const logger = pino({ name: 'agent-factory' });
+
+// Singleton conductor (reused across requests in the same process)
+let _conductor: ConductorAgent | null = null;
+function getConductor(): ConductorAgent {
+  if (!_conductor) _conductor = new ConductorAgent(prisma);
+  return _conductor;
+}
+
+let _reflexion: ReflexionSystem | null = null;
+function getReflexion(): ReflexionSystem {
+  if (!_reflexion) _reflexion = new ReflexionSystem(prisma);
+  return _reflexion;
+}
 
 // ============================================================================
 // Agent Registration
@@ -447,4 +464,173 @@ export function resetAllAgents(): void {
   import('./narrator-agent').then(({ resetNarratorAgent }) => {
     resetNarratorAgent();
   });
+}
+
+/**
+ * Run per-response agent analysis (Analyzer → Tagger → Verifier).
+ * Called automatically from the transcription webhook.
+ */
+export async function analyzeResponse(params: {
+  responseId: string;
+  interviewId: string;
+  transcript: string;
+  questionId: string;
+}): Promise<void> {
+  const start = Date.now();
+  try {
+    // Fetch question context for better agent accuracy
+    const response = await prisma.response.findUnique({
+      where: { id: params.responseId },
+      select: {
+        question: {
+          select: { content: true, category: true, skillTags: true },
+        },
+        interview: {
+          select: { position: true },
+        },
+      },
+    });
+
+    const result = await getConductor().processResponse({
+      interviewId: params.interviewId,
+      questionId: params.questionId,
+      transcript: params.transcript,
+      questionCategory: response?.question.category ?? 'general',
+      position: response?.interview.position ?? 'Unknown',
+      questionText: response?.question.content,
+      expectedConcepts: response?.question.skillTags ?? [],
+    });
+
+    // Persist agent outputs back to the Response row
+    const tags = extractTags(result.tagged);
+    const scores = extractScores(result.analyzed);
+    const sentiment = extractSentiment(result.tagged);
+
+    await prisma.response.update({
+      where: { id: params.responseId },
+      data: {
+        scores,
+        tags,
+        sentiment,
+        confidence: result.verified.confidence,
+        agentAnalysis: {
+          analyzed: result.analyzed.result,
+          tagged: result.tagged.result,
+          verified: result.verified.result,
+        },
+        analyzedAt: new Date(),
+      },
+    });
+
+    // Update question learning metrics
+    await prisma.question.update({
+      where: { id: params.questionId },
+      data: {
+        timesAsked: { increment: 1 },
+        lastUsed: new Date(),
+      },
+    });
+
+    logger.info(
+      { responseId: params.responseId, elapsedMs: Date.now() - start },
+      'per-response agent analysis complete',
+    );
+  } catch (err: unknown) {
+    logger.error(
+      { err, responseId: params.responseId },
+      'per-response agent analysis failed',
+    );
+    // Do NOT rethrow — a failed analysis must not block the interview
+  }
+}
+
+/**
+ * Finalize interview: run Scorer → Narrator, update Interview record,
+ * then trigger ReflexionSystem learning.
+ * Called from the /complete route after the last response is submitted.
+ */
+export async function finalizeInterview(interviewId: string): Promise<void> {
+  const start = Date.now();
+  try {
+    const interview = await prisma.interview.findUnique({
+      where: { id: interviewId },
+      include: {
+        responses: { select: { id: true, scores: true, transcript: true } },
+      },
+    });
+
+    if (!interview) throw new Error(`Interview ${interviewId} not found`);
+
+    // Fetch position-specific scoring model (active model, fallback to default)
+    const scoringModel =
+      (await prisma.scoringModel.findFirst({
+        where: { position: interview.position, isActive: true },
+      })) ?? null;
+
+    const { scoring, explanation } = await getConductor().finalizeInterview({
+      interviewId,
+      responses: interview.responses,
+      scoringModel,
+      position: interview.position,
+      candidateName: interview.candidateName,
+    });
+
+    // Persist decision and explainability to Interview row
+    await prisma.interview.update({
+      where: { id: interviewId },
+      data: {
+        score: Number(scoring.result.overallScore ?? 0),
+        decision:
+          typeof scoring.result.decision === 'string'
+            ? scoring.result.decision
+            : null,
+        explainability: { scoring: scoring.result, explanation: explanation.result },
+        completedAt: new Date(),
+        status: 'COMPLETED',
+      },
+    });
+
+    // Trigger reflexion learning in background
+    await getReflexion().learnFromInterview(interviewId);
+
+    logger.info(
+      { interviewId, decision: scoring.result.decision, elapsedMs: Date.now() - start },
+      'interview finalized',
+    );
+  } catch (err: unknown) {
+    logger.error({ err, interviewId }, 'interview finalization failed');
+    throw err; // Rethrow so the /complete route can surface the error
+  }
+}
+
+// --- Helpers ---
+function extractTags(taggedOutput: AgentOutput): string[] {
+  const r = taggedOutput?.result as {
+    skillTags?: unknown;
+    behavioralTags?: unknown;
+    competencyTags?: unknown;
+  };
+  if (!r) return [];
+  return [
+    ...(Array.isArray(r.skillTags) ? r.skillTags : []),
+    ...(Array.isArray(r.behavioralTags) ? r.behavioralTags : []),
+    ...(Array.isArray(r.competencyTags) ? r.competencyTags : []),
+  ].filter((t): t is string => typeof t === 'string');
+}
+
+function extractScores(analyzedOutput: AgentOutput): Record<string, number> {
+  const result = analyzedOutput?.result as { scores?: unknown };
+  if (!result?.scores || typeof result.scores !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(result.scores as Record<string, unknown>).filter(
+      ([, value]) => typeof value === 'number' && Number.isFinite(value),
+    ),
+  );
+}
+
+function extractSentiment(taggedOutput: AgentOutput): number | null {
+  const result = taggedOutput?.result as { sentiment?: unknown };
+  return typeof result?.sentiment === 'number' && Number.isFinite(result.sentiment)
+    ? result.sentiment
+    : null;
 }

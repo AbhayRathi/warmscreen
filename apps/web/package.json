@@ -16,6 +16,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1015.0",
     "@prisma/client": "5.22.0",
     "@vercel/functions": "^3.4.3",
+    "@warmscreen/agents": "*",
     "@warmscreen/database": "*",
     "@warmscreen/shared": "*",
     "date-fns": "^3.0.6",

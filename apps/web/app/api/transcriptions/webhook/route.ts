@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { voiceEnv, isVoiceEnabled } from '@/lib/env';
 import { checkRateLimit } from '@/lib/rate-limit';
 import prisma from '@/lib/db/prisma';
+import { analyzeResponse } from '@/lib/agents/agent-factory';
 import pino from 'pino';
 
 const logger = pino({ name: 'transcriptions-webhook' });
@@ -100,6 +101,25 @@ export async function POST(req: NextRequest) {
 
     // Mark as processed
     processedWebhooks.set(validated.responseId, Date.now());
+
+    // Trigger per-response agent analysis in background
+    const responseMeta = await prisma.response.findUnique({
+      where: { id: validated.responseId },
+      select: { interviewId: true, questionId: true },
+    });
+    if (responseMeta) {
+      analyzeResponse({
+        responseId: validated.responseId,
+        interviewId: responseMeta.interviewId,
+        transcript: validated.transcript,
+        questionId: responseMeta.questionId,
+      }).catch((err) => {
+        logger.error(
+          { err, responseId: validated.responseId },
+          'background agent analysis failed',
+        );
+      });
+    }
 
     logger.info(
       { responseId: validated.responseId, language: validated.language },
