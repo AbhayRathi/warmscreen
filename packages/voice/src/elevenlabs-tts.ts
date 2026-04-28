@@ -10,6 +10,14 @@ export interface VoiceProfile {
   category?: string;
 }
 
+type AudioChunk = Uint8Array | ArrayBuffer | Buffer;
+type ReaderLike = {
+  read: () => Promise<{ done: boolean; value?: unknown }>;
+  releaseLock?: () => void;
+};
+type ReaderStreamLike = { getReader: () => ReaderLike };
+type AudioStreamLike = AsyncIterable<unknown> | ReaderStreamLike;
+
 /**
  * ElevenLabsManager
  * Handles text-to-speech with voice cloning using ElevenLabs API
@@ -170,34 +178,31 @@ export class ElevenLabsManager {
     return this.client.user.subscription;
   }
 
-  private async *toAsyncChunkIterator(
-    stream: unknown
-  ): AsyncIterable<Uint8Array | ArrayBuffer | Buffer> {
-    const maybeAsyncIterable = stream as {
-      [Symbol.asyncIterator]?: () => AsyncIterator<unknown>;
-    };
+  private async *toAsyncChunkIterator(stream: AudioStreamLike): AsyncIterable<AudioChunk> {
+    const maybeAsyncIterable = stream as AsyncIterable<unknown>;
     if (typeof maybeAsyncIterable[Symbol.asyncIterator] === 'function') {
-      for await (const chunk of maybeAsyncIterable as AsyncIterable<unknown>) {
-        if (chunk !== undefined && chunk !== null) {
-          yield chunk as Uint8Array | ArrayBuffer | Buffer;
+      for await (const chunk of maybeAsyncIterable) {
+        if (this.isAudioChunk(chunk)) {
+          yield chunk;
+        } else if (chunk !== undefined && chunk !== null) {
+          throw new Error('Unsupported ElevenLabs chunk type from async iterable stream');
         }
       }
       return;
     }
 
-    const maybeReadable = stream as {
-      getReader?: () => {
-        read: () => Promise<{ done: boolean; value?: Uint8Array | ArrayBuffer | Buffer }>;
-        releaseLock?: () => void;
-      };
-    };
+    const maybeReadable = stream as ReaderStreamLike;
     if (typeof maybeReadable.getReader === 'function') {
       const reader = maybeReadable.getReader();
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          if (value !== undefined) yield value;
+          if (this.isAudioChunk(value)) {
+            yield value;
+          } else if (value !== undefined && value !== null) {
+            throw new Error('Unsupported ElevenLabs chunk type from reader stream');
+          }
         }
       } finally {
         reader.releaseLock?.();
@@ -212,5 +217,13 @@ export class ElevenLabsManager {
     if (Buffer.isBuffer(chunk)) return chunk;
     if (chunk instanceof Uint8Array) return Buffer.from(chunk);
     return Buffer.from(new Uint8Array(chunk));
+  }
+
+  private isAudioChunk(value: unknown): value is AudioChunk {
+    return (
+      Buffer.isBuffer(value) ||
+      value instanceof Uint8Array ||
+      value instanceof ArrayBuffer
+    );
   }
 }

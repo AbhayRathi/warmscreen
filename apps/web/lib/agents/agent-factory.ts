@@ -646,6 +646,11 @@ function extractScores(analyzedOutput: AgentOutput): Record<string, number> {
   )) {
     if (typeof value === 'number' && Number.isFinite(value)) {
       scores[key] = value;
+    } else {
+      logger.warn(
+        { key, valueType: typeof value },
+        'ignoring invalid non-numeric score value',
+      );
     }
   }
   return scores;

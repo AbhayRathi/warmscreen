@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       },
     });
     if (responseMeta) {
-      analyzeResponse({
+      void analyzeResponse({
         responseId: validated.responseId,
         interviewId: responseMeta.interviewId,
         transcript: validated.transcript,
