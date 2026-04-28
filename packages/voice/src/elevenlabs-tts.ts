@@ -185,7 +185,9 @@ export class ElevenLabsManager {
         if (this.isAudioChunk(chunk)) {
           yield chunk;
         } else if (chunk !== undefined && chunk !== null) {
-          throw new Error('Unsupported ElevenLabs chunk type from async iterable stream');
+          throw new Error(
+            `Unsupported ElevenLabs chunk type from async iterable stream: ${typeof chunk}`,
+          );
         }
       }
       return;
@@ -201,7 +203,9 @@ export class ElevenLabsManager {
           if (this.isAudioChunk(value)) {
             yield value;
           } else if (value !== undefined && value !== null) {
-            throw new Error('Unsupported ElevenLabs chunk type from reader stream');
+            throw new Error(
+              `Unsupported ElevenLabs chunk type from reader stream: ${typeof value}`,
+            );
           }
         }
       } finally {
