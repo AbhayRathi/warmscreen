@@ -105,7 +105,16 @@ export async function POST(req: NextRequest) {
     // Trigger per-response agent analysis in background
     const responseMeta = await prisma.response.findUnique({
       where: { id: validated.responseId },
-      select: { interviewId: true, questionId: true },
+      select: {
+        interviewId: true,
+        questionId: true,
+        question: {
+          select: { category: true, content: true, skillTags: true },
+        },
+        interview: {
+          select: { position: true },
+        },
+      },
     });
     if (responseMeta) {
       analyzeResponse({
@@ -113,6 +122,10 @@ export async function POST(req: NextRequest) {
         interviewId: responseMeta.interviewId,
         transcript: validated.transcript,
         questionId: responseMeta.questionId,
+        questionCategory: responseMeta.question.category,
+        position: responseMeta.interview.position,
+        questionText: responseMeta.question.content,
+        expectedConcepts: responseMeta.question.skillTags,
       }).catch((err) => {
         logger.error(
           { err, responseId: validated.responseId },

@@ -11,7 +11,7 @@ export async function POST(
 ) {
   try {
     // Completion now relies on agent-driven finalization in `finalizeInterview`,
-    // so we no longer consume optional request-body score overrides here.
+    // so we no longer consume optional request body score overrides here.
     const { id } = await params;
     
     // Get the interview

@@ -475,33 +475,49 @@ export async function analyzeResponse(params: {
   interviewId: string;
   transcript: string;
   questionId: string;
+  questionCategory?: string;
+  position?: string;
+  questionText?: string;
+  expectedConcepts?: string[];
 }): Promise<void> {
   const start = Date.now();
   try {
-    // Fetch question context for better agent accuracy
-    const response = await prisma.response.findUnique({
-      where: { id: params.responseId },
-      select: {
-        question: {
-          select: { content: true, category: true, skillTags: true },
+    let questionCategory = params.questionCategory;
+    let position = params.position;
+    let questionText = params.questionText;
+    let expectedConcepts = params.expectedConcepts;
+
+    if (!questionCategory || !position || expectedConcepts === undefined) {
+      // Fetch question context for better agent accuracy
+      const response = await prisma.response.findUnique({
+        where: { id: params.responseId },
+        select: {
+          question: {
+            select: { content: true, category: true, skillTags: true },
+          },
+          interview: {
+            select: { position: true },
+          },
         },
-        interview: {
-          select: { position: true },
-        },
-      },
-    });
-    if (!response) {
-      throw new Error(`Response ${params.responseId} not found`);
+      });
+      if (!response) {
+        throw new Error(`Response ${params.responseId} not found`);
+      }
+
+      questionCategory = questionCategory ?? response.question.category;
+      position = position ?? response.interview.position;
+      questionText = questionText ?? response.question.content;
+      expectedConcepts = expectedConcepts ?? response.question.skillTags;
     }
 
     const result = await getConductor().processResponse({
       interviewId: params.interviewId,
       questionId: params.questionId,
       transcript: params.transcript,
-      questionCategory: response?.question.category ?? 'general',
-      position: response?.interview.position ?? 'Unknown',
-      questionText: response?.question.content,
-      expectedConcepts: response?.question.skillTags ?? [],
+      questionCategory: questionCategory ?? 'general',
+      position: position ?? 'Unknown',
+      questionText,
+      expectedConcepts: expectedConcepts ?? [],
     });
 
     // Persist agent outputs back to the Response row
