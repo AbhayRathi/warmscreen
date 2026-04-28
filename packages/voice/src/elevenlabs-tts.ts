@@ -215,7 +215,9 @@ export class ElevenLabsManager {
 
   private chunkToBuffer(chunk: Uint8Array | ArrayBuffer | Buffer): Buffer {
     if (Buffer.isBuffer(chunk)) return chunk;
-    if (chunk instanceof Uint8Array) return Buffer.from(chunk);
+    if (chunk instanceof Uint8Array) {
+      return Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+    }
     return Buffer.from(new Uint8Array(chunk));
   }
 

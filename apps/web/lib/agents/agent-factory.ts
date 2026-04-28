@@ -32,16 +32,14 @@ import prisma from '../db/prisma';
 
 const logger = pino({ name: 'agent-factory' });
 
-// Singleton conductor (reused across requests in the same process)
-let _conductor: ConductorAgent | null = null;
+// Singleton conductor/reflexion instances (reused across requests in the same process)
+const _conductor = new ConductorAgent(prisma);
 function getConductor(): ConductorAgent {
-  if (!_conductor) _conductor = new ConductorAgent(prisma);
   return _conductor;
 }
 
-let _reflexion: ReflexionSystem | null = null;
+const _reflexion = new ReflexionSystem(prisma);
 function getReflexion(): ReflexionSystem {
-  if (!_reflexion) _reflexion = new ReflexionSystem(prisma);
   return _reflexion;
 }
 
@@ -639,7 +637,13 @@ function extractTags(taggedOutput: AgentOutput): string[] {
 
 function extractScores(analyzedOutput: AgentOutput): Record<string, number> {
   const result = analyzedOutput?.result as { scores?: unknown };
-  if (!result?.scores || typeof result.scores !== 'object') return {};
+  if (
+    !result?.scores ||
+    typeof result.scores !== 'object' ||
+    Array.isArray(result.scores)
+  ) {
+    return {};
+  }
   const scores: Record<string, number> = {};
   for (const [key, value] of Object.entries(
     result.scores as Record<string, unknown>,
