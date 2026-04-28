@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getInterviewById, completeInterview } from '@/lib/db/interview';
+import { getInterviewById } from '@/lib/db/interview';
 import { getResponseCount } from '@/lib/db/response';
 import { TARGET_QUESTIONS } from '@/lib/services/question-selection';
+import { finalizeInterview } from '@/lib/agents/agent-factory';
 
 // POST /api/interviews/[id]/complete - Complete an interview
 export async function POST(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Completion now relies on agent-driven finalization in `finalizeInterview`,
+    // so we no longer consume optional request body score overrides here.
     const { id } = await params;
     
     // Get the interview
@@ -44,19 +47,16 @@ export async function POST(
       );
     }
     
-    // Parse optional final score from body
-    let finalScore: number | undefined;
-    try {
-      const body = await req.json();
-      if (typeof body.finalScore === 'number') {
-        finalScore = body.finalScore;
-      }
-    } catch {
-      // No body provided, which is fine
+    // Trigger agent-based interview finalization
+    await finalizeInterview(id);
+
+    const updatedInterview = await getInterviewById(id);
+    if (!updatedInterview) {
+      return NextResponse.json(
+        { error: 'Interview not found after completion' },
+        { status: 404 }
+      );
     }
-    
-    // Complete the interview
-    const updatedInterview = await completeInterview(id, finalScore);
     
     return NextResponse.json({
       success: true,

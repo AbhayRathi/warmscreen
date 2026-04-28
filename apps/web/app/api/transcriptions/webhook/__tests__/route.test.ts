@@ -21,6 +21,10 @@ vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: vi.fn(() => ({ allowed: true, remaining: 29 })),
 }));
 
+vi.mock('@/lib/agents/agent-factory', () => ({
+  analyzeResponse: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('pino', () => ({
   default: () => ({
     info: vi.fn(),
