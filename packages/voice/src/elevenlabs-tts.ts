@@ -53,8 +53,8 @@ export class ElevenLabsManager {
 
     // Convert stream to buffer
     const chunks: Buffer[] = [];
-    for await (const chunk of audioStream) {
-      chunks.push(Buffer.from(chunk));
+    for await (const chunk of this.toAsyncChunkIterator(audioStream)) {
+      chunks.push(this.chunkToBuffer(chunk));
     }
     
     return Buffer.concat(chunks);
@@ -84,9 +84,10 @@ export class ElevenLabsManager {
     });
 
     // Return async generator that yields buffers
+    const self = this;
     return (async function* () {
-      for await (const chunk of audioStream) {
-        yield Buffer.from(chunk);
+      for await (const chunk of self.toAsyncChunkIterator(audioStream)) {
+        yield self.chunkToBuffer(chunk);
       }
     })();
   }
@@ -167,5 +168,49 @@ export class ElevenLabsManager {
    */
   async getSubscriptionInfo(): Promise<any> {
     return this.client.user.subscription;
+  }
+
+  private async *toAsyncChunkIterator(
+    stream: unknown
+  ): AsyncIterable<Uint8Array | ArrayBuffer | Buffer> {
+    const maybeAsyncIterable = stream as {
+      [Symbol.asyncIterator]?: () => AsyncIterator<unknown>;
+    };
+    if (typeof maybeAsyncIterable[Symbol.asyncIterator] === 'function') {
+      for await (const chunk of maybeAsyncIterable as AsyncIterable<unknown>) {
+        if (chunk !== undefined && chunk !== null) {
+          yield chunk as Uint8Array | ArrayBuffer | Buffer;
+        }
+      }
+      return;
+    }
+
+    const maybeReadable = stream as {
+      getReader?: () => {
+        read: () => Promise<{ done: boolean; value?: Uint8Array | ArrayBuffer | Buffer }>;
+        releaseLock?: () => void;
+      };
+    };
+    if (typeof maybeReadable.getReader === 'function') {
+      const reader = maybeReadable.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value !== undefined) yield value;
+        }
+      } finally {
+        reader.releaseLock?.();
+      }
+      return;
+    }
+
+    throw new Error('Unsupported ElevenLabs audio stream type');
+  }
+
+  private chunkToBuffer(chunk: Uint8Array | ArrayBuffer | Buffer): Buffer {
+    if (Buffer.isBuffer(chunk)) return chunk;
+    if (chunk instanceof Uint8Array) return Buffer.from(chunk);
+    return Buffer.from(new Uint8Array(chunk));
   }
 }

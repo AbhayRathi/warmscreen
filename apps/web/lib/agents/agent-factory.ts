@@ -640,11 +640,15 @@ function extractTags(taggedOutput: AgentOutput): string[] {
 function extractScores(analyzedOutput: AgentOutput): Record<string, number> {
   const result = analyzedOutput?.result as { scores?: unknown };
   if (!result?.scores || typeof result.scores !== 'object') return {};
-  return Object.fromEntries(
-    Object.entries(result.scores as Record<string, unknown>).filter(
-      ([, value]) => typeof value === 'number' && Number.isFinite(value),
-    ),
-  );
+  const scores: Record<string, number> = {};
+  for (const [key, value] of Object.entries(
+    result.scores as Record<string, unknown>,
+  )) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      scores[key] = value;
+    }
+  }
+  return scores;
 }
 
 function extractSentiment(taggedOutput: AgentOutput): number | null {
